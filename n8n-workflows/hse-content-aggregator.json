@@ -1,0 +1,303 @@
+{
+  "name": "HSE Content Aggregator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://press.hse.gov.uk/",
+        "options": {}
+      },
+      "id": "fetch-hse-press",
+      "name": "Fetch HSE Press Releases",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "articles",
+        "filterType": "manual",
+        "matchType": "matchAny",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "source_url",
+              "condition": "equals",
+              "keyValue": "={{ $json.url }}"
+            }
+          ]
+        }
+      },
+      "id": "check-duplicates",
+      "name": "Check for Duplicates",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "equal",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "if-not-exists",
+      "name": "IF Not Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-5",
+        "prompt": "=You are a professional health and safety news editor. Rewrite this article for a UK professional audience.\n\nOriginal Article:\nTitle: {{ $json.title }}\nContent: {{ $json.content }}\n\nProvide your response ONLY as valid JSON in this exact format (no other text):\n{\n  \"title\": \"Improved professional headline\",\n  \"content\": \"Full article rewritten in Markdown format with proper headings, lists, and formatting\",\n  \"excerpt\": \"Compelling 150-200 character summary\",\n  \"category\": \"workplace-safety\",\n  \"tags\": [\"relevant\", \"tags\"],\n  \"priority\": \"HIGH\",\n  \"quality_score\": 8.5\n}\n\nCategory must be one of: workplace-safety, fire-safety, chemical-safety, construction, healthcare, food-safety, ergonomics, mental-health, incidents, regulations, best-practices\nPriority must be: HIGH, MEDIUM, or LOW\nQuality score: 0.0 to 10.0"
+      },
+      "id": "claude-rewrite",
+      "name": "Claude AI Rewrite",
+      "type": "@n8n/n8n-nodes-anthropic.claude",
+      "typeVersion": 1,
+      "position": [1250, 200],
+      "credentials": {
+        "anthropicApi": {
+          "id": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate reading time\nconst content = $input.item.json.content;\nconst words = content.split(/\\s+/).length;\nconst readingTime = Math.ceil(words / 200);\n\n// Generate slug\nconst title = $input.item.json.title;\nconst slug = title\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, '-')\n  .replace(/(^-|-$)/g, '');\n\nreturn {\n  json: {\n    ...$input.item.json,\n    reading_time: readingTime,\n    slug: slug\n  }\n};"
+      },
+      "id": "process-article",
+      "name": "Process Article Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "articles",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "title": "={{ $json.title }}",
+            "slug": "={{ $json.slug }}",
+            "content": "={{ $json.content }}",
+            "excerpt": "={{ $json.excerpt }}",
+            "category": "={{ $json.category }}",
+            "tags": "={{ $json.tags }}",
+            "source_url": "={{ $('Fetch HSE Press Releases').item.json.url }}",
+            "status": "pending_review",
+            "quality_score": "={{ $json.quality_score }}",
+            "priority": "={{ $json.priority }}",
+            "reading_time": "={{ $json.reading_time }}",
+            "ai_generated": true
+          }
+        }
+      },
+      "id": "insert-article",
+      "name": "Insert to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1650, 200],
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.priority }}",
+              "operation": "equals",
+              "value2": "HIGH"
+            }
+          ]
+        }
+      },
+      "id": "if-high-priority",
+      "name": "IF High Priority",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1850, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{{ $env.NEXT_PUBLIC_SITE_URL }}/api/webhook/article-published",
+        "authentication": "genericCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-webhook-secret",
+              "value": "={{ $env.WEBHOOK_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "article_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "slug",
+              "value": "={{ $json.slug }}"
+            },
+            {
+              "name": "title",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "name": "excerpt",
+              "value": "={{ $json.excerpt }}"
+            }
+          ]
+        }
+      },
+      "id": "notify-high-priority",
+      "name": "Send High Priority Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2050, 100]
+    }
+  ],
+  "connections": {
+    "Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Fetch HSE Press Releases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch HSE Press Releases": {
+      "main": [
+        [
+          {
+            "node": "Check for Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for Duplicates": {
+      "main": [
+        [
+          {
+            "node": "IF Not Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Not Exists": {
+      "main": [
+        [
+          {
+            "node": "Claude AI Rewrite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude AI Rewrite": {
+      "main": [
+        [
+          {
+            "node": "Process Article Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Article Data": {
+      "main": [
+        [
+          {
+            "node": "Insert to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert to Supabase": {
+      "main": [
+        [
+          {
+            "node": "IF High Priority",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF High Priority": {
+      "main": [
+        [
+          {
+            "node": "Send High Priority Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "id": "content-automation",
+      "name": "Content Automation"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-04T00:00:00.000Z",
+  "versionId": "1"
+}

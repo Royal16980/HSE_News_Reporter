@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.glass-panel {
+  backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.glass-panel-dark {
+  backdrop-filter: blur(16px);
+  background: rgba(0, 0, 0, 0.55);
+}
