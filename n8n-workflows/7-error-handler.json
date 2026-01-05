@@ -1,0 +1,506 @@
+{
+  "name": "7. Global Error Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "webhook/error-alert",
+        "options": {
+          "rawBody": false
+        },
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "id": "webhook-error",
+      "name": "Error Alert Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 400],
+      "webhookId": "error-alert",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "Webhook Secret Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const errorData = $input.item.json.body;\n\n// Classify error severity\nfunction classifyError(error) {\n  const message = error.message?.toLowerCase() || '';\n  const workflow = error.workflow || '';\n  \n  // Critical errors\n  if (\n    message.includes('database') ||\n    message.includes('connection') ||\n    message.includes('authentication') ||\n    message.includes('api key') ||\n    workflow === '2-ai-processing-pipeline'\n  ) {\n    return 'critical';\n  }\n  \n  // High priority\n  if (\n    message.includes('claude') ||\n    message.includes('supabase') ||\n    message.includes('timeout') ||\n    workflow === '3-smart-publisher'\n  ) {\n    return 'high';\n  }\n  \n  // Medium priority\n  if (\n    message.includes('social media') ||\n    message.includes('newsletter') ||\n    message.includes('image')\n  ) {\n    return 'medium';\n  }\n  \n  // Low priority (warnings, transient errors)\n  return 'low';\n}\n\n// Determine if retry is appropriate\nfunction shouldRetry(error) {\n  const message = error.message?.toLowerCase() || '';\n  \n  // Don't retry authentication or validation errors\n  if (\n    message.includes('unauthorized') ||\n    message.includes('invalid') ||\n    message.includes('forbidden') ||\n    message.includes('not found')\n  ) {\n    return false;\n  }\n  \n  // Retry network/timeout errors\n  if (\n    message.includes('timeout') ||\n    message.includes('network') ||\n    message.includes('econnrefused') ||\n    message.includes('503') ||\n    message.includes('502')\n  ) {\n    return true;\n  }\n  \n  return false;\n}\n\nconst severity = classifyError(errorData);\nconst canRetry = shouldRetry(errorData);\n\nreturn {\n  json: {\n    ...errorData,\n    severity: severity,\n    can_retry: canRetry,\n    classified_at: new Date().toISOString(),\n    error_id: `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`\n  }\n};"
+      },
+      "id": "classify-error",
+      "name": "Classify Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "error_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "error_id",
+              "fieldValue": "={{ $json.error_id }}"
+            },
+            {
+              "fieldId": "workflow_name",
+              "fieldValue": "={{ $json.workflow }}"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "={{ $json.node || 'unknown' }}"
+            },
+            {
+              "fieldId": "severity",
+              "fieldValue": "={{ $json.severity }}"
+            },
+            {
+              "fieldId": "error_message",
+              "fieldValue": "={{ $json.message }}"
+            },
+            {
+              "fieldId": "error_stack",
+              "fieldValue": "={{ $json.stack || '' }}"
+            },
+            {
+              "fieldId": "can_retry",
+              "fieldValue": "={{ $json.can_retry }}"
+            },
+            {
+              "fieldId": "retry_count",
+              "fieldValue": "={{ $json.retry_count || 0 }}"
+            },
+            {
+              "fieldId": "context",
+              "fieldValue": "={{ JSON.stringify($json.context || {}) }}"
+            },
+            {
+              "fieldId": "occurred_at",
+              "fieldValue": "={{ $json.occurred_at || new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "log-to-db",
+      "name": "Log Error to Database",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [650, 400],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.severity }}",
+              "operation": "equals",
+              "value2": "critical"
+            }
+          ]
+        }
+      },
+      "id": "is-critical",
+      "name": "Is Critical?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "const error = $input.item.json;\n\n// Format error for immediate alert\nconst alert = `\n🚨 CRITICAL ERROR ALERT\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nError ID: ${error.error_id}\nWorkflow: ${error.workflow}\nNode: ${error.node || 'unknown'}\nSeverity: ${error.severity.toUpperCase()}\n\nMessage:\n${error.message}\n\nOccurred At: ${error.occurred_at}\n\n${error.can_retry ? '🔄 AUTO-RETRY: Will attempt automatic retry' : '⛔ NO AUTO-RETRY: Manual intervention required'}\n\nRetry Count: ${error.retry_count || 0}/3\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nImmediate action required!\n`;\n\nreturn {\n  json: {\n    ...error,\n    alert_message: alert\n  }\n};"
+      },
+      "id": "format-critical-alert",
+      "name": "Format Critical Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $env.ADMIN_EMAIL }}",
+        "subject": "🚨 CRITICAL: {{ $json.workflow }} Error [{{ $json.error_id }}]",
+        "emailType": "text",
+        "message": "={{ $json.alert_message }}",
+        "options": {
+          "senderName": "HSE News Error Monitor",
+          "priority": "high"
+        }
+      },
+      "id": "send-critical-email",
+      "name": "Send Critical Alert Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1250, 300],
+      "credentials": {
+        "smtp": {
+          "id": "7",
+          "name": "SMTP Email Service"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $('Classify Error').item.json.can_retry }}",
+              "value2": true
+            }
+          ],
+          "number": [
+            {
+              "value1": "={{ $('Classify Error').item.json.retry_count || 0 }}",
+              "operation": "smaller",
+              "value2": 3
+            }
+          ]
+        }
+      },
+      "id": "should-retry",
+      "name": "Should Retry?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 500]
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.pow(2, $('Classify Error').item.json.retry_count || 0) }}",
+        "unit": "minutes"
+      },
+      "id": "wait-exponential",
+      "name": "Wait (Exponential Backoff)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1250, 450]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Classify Error').item.json.retry_webhook || $env.N8N_WEBHOOK_URL + 'workflow/' + $('Classify Error').item.json.workflow }}",
+        "options": {
+          "headers": {
+            "entries": [
+              {
+                "name": "x-webhook-secret",
+                "value": "={{ $env.WEBHOOK_SECRET }}"
+              },
+              {
+                "name": "x-retry-attempt",
+                "value": "={{ ($('Classify Error').item.json.retry_count || 0) + 1 }}"
+              }
+            ]
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Classify Error').item.json.retry_payload || {}) }}"
+      },
+      "id": "trigger-retry",
+      "name": "Trigger Workflow Retry",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1450, 450]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "error_logs",
+        "filterType": "manual",
+        "matchBy": "error_id",
+        "valueId": "={{ $('Classify Error').item.json.error_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "retry_attempted",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "retry_count",
+              "fieldValue": "={{ ($('Classify Error').item.json.retry_count || 0) + 1 }}"
+            },
+            {
+              "fieldId": "last_retry_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "update-retry-log",
+      "name": "Update Retry Log",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1650, 450],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "error_logs",
+        "filterType": "manual",
+        "matchBy": "error_id",
+        "valueId": "={{ $('Classify Error').item.json.error_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "resolved",
+              "fieldValue": "false"
+            },
+            {
+              "fieldId": "requires_manual_intervention",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "resolution_notes",
+              "fieldValue": "Max retries exceeded or non-retryable error. Manual intervention required."
+            }
+          ]
+        }
+      },
+      "id": "mark-needs-intervention",
+      "name": "Mark Needs Manual Intervention",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1250, 600],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ \n  success: true, \n  error_id: $('Classify Error').item.json.error_id,\n  severity: $('Classify Error').item.json.severity,\n  logged: true\n}) }}"
+      },
+      "id": "respond-success",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 600]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-cleanup",
+      "name": "Every 6 Hours (Cleanup)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 800]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Delete resolved errors older than 30 days\nDELETE FROM error_logs\nWHERE resolved = true\n  AND occurred_at < NOW() - INTERVAL '30 days';\n\n-- Get stats on cleanup\nSELECT \n  COUNT(*) FILTER (WHERE resolved = true) as resolved_count,\n  COUNT(*) FILTER (WHERE resolved = false AND requires_manual_intervention = true) as needs_attention,\n  COUNT(*) FILTER (WHERE severity = 'critical') as critical_count\nFROM error_logs\nWHERE occurred_at >= NOW() - INTERVAL '7 days';"
+      },
+      "id": "cleanup-old-errors",
+      "name": "Cleanup Old Error Logs",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [450, 800],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const stats = $input.item.json[0] || {};\n\nconsole.log('Error Log Cleanup Summary:');\nconsole.log('- Resolved errors (last 7d):', stats.resolved_count);\nconsole.log('- Needs attention:', stats.needs_attention);\nconsole.log('- Critical errors:', stats.critical_count);\n\nif (stats.needs_attention > 0) {\n  console.warn(`⚠️ ${stats.needs_attention} errors require manual intervention`);\n}\n\nreturn { json: stats };"
+      },
+      "id": "log-cleanup",
+      "name": "Log Cleanup Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 800]
+    }
+  ],
+  "connections": {
+    "Error Alert Webhook": {
+      "main": [
+        [
+          {
+            "node": "Classify Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Error": {
+      "main": [
+        [
+          {
+            "node": "Log Error to Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error to Database": {
+      "main": [
+        [
+          {
+            "node": "Is Critical?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Critical?": {
+      "main": [
+        [
+          {
+            "node": "Format Critical Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Should Retry?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Critical Alert": {
+      "main": [
+        [
+          {
+            "node": "Send Critical Alert Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Critical Alert Email": {
+      "main": [
+        [
+          {
+            "node": "Should Retry?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Retry?": {
+      "main": [
+        [
+          {
+            "node": "Wait (Exponential Backoff)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Needs Manual Intervention",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait (Exponential Backoff)": {
+      "main": [
+        [
+          {
+            "node": "Trigger Workflow Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Workflow Retry": {
+      "main": [
+        [
+          {
+            "node": "Update Retry Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Retry Log": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Needs Manual Intervention": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 6 Hours (Cleanup)": {
+      "main": [
+        [
+          {
+            "node": "Cleanup Old Error Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleanup Old Error Logs": {
+      "main": [
+        [
+          {
+            "node": "Log Cleanup Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": null
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 2,
+  "updatedAt": "2026-01-05T00:00:00.000Z",
+  "versionId": "1"
+}

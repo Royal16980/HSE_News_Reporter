@@ -1,0 +1,268 @@
+{
+  "name": "5. Weekly Newsletter Compiler",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 0"
+            }
+          ]
+        }
+      },
+      "id": "schedule-weekly",
+      "name": "Every Sunday 8 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 400]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "tableId": "articles",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "equals",
+              "keyValue": "published"
+            },
+            {
+              "keyName": "published_at",
+              "condition": "greaterEqual",
+              "keyValue": "={{ new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() }}"
+            }
+          ]
+        },
+        "options": {
+          "sort": {
+            "values": [
+              {
+                "column": "views_count",
+                "direction": "DESC"
+              }
+            ]
+          }
+        }
+      },
+      "id": "get-week-articles",
+      "name": "Get Last Week's Articles",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [450, 400],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const articles = $input.all();\n\nif (articles.length === 0) {\n  throw new Error('No articles published this week');\n}\n\n// Group by category\nconst byCategory = {};\narticles.forEach(item => {\n  const category = item.json.category;\n  if (!byCategory[category]) {\n    byCategory[category] = [];\n  }\n  byCategory[category].push(item.json);\n});\n\n// Featured articles (top 3 by views)\nconst featured = articles.slice(0, 3).map(item => item.json);\n\n// Quick reads (shortest reading time)\nconst quickReads = [...articles]\n  .sort((a, b) => a.json.reading_time - b.json.reading_time)\n  .slice(0, 5)\n  .map(item => item.json);\n\n// Statistics\nconst stats = {\n  total_articles: articles.length,\n  categories_covered: Object.keys(byCategory).length,\n  total_reading_time: articles.reduce((sum, item) => sum + (item.json.reading_time || 0), 0)\n};\n\nreturn [{\n  json: {\n    articles: articles.map(item => item.json),\n    by_category: byCategory,\n    featured: featured,\n    quick_reads: quickReads,\n    stats: stats,\n    week_start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],\n    week_end: new Date().toISOString().split('T')[0]\n  }\n}];"
+      },
+      "id": "organize-content",
+      "name": "Organize Newsletter Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = $input.item.json;\nconst siteUrl = $env.NEXT_PUBLIC_SITE_URL;\n\n// Helper function to format article for email\nfunction formatArticle(article) {\n  return `\n    <tr>\n      <td style=\"padding: 20px 0; border-bottom: 1px solid #e5e7eb;\">\n        ${article.featured_image_url ? `\n          <img src=\"${article.featured_image_url}\" alt=\"${article.title}\" style=\"width: 100%; max-width: 600px; height: auto; border-radius: 8px; margin-bottom: 16px;\">\n        ` : ''}\n        <h2 style=\"margin: 0 0 12px 0; font-size: 24px; font-weight: 600; color: #111827;\">\n          <a href=\"${siteUrl}/articles/${article.slug}\" style=\"color: #3b82f6; text-decoration: none;\">${article.title}</a>\n        </h2>\n        <p style=\"margin: 0 0 12px 0; color: #6b7280; font-size: 16px; line-height: 1.6;\">${article.excerpt}</p>\n        <div style=\"display: flex; gap: 12px; align-items: center; font-size: 14px; color: #9ca3af;\">\n          <span style=\"background: #eff6ff; color: #3b82f6; padding: 4px 12px; border-radius: 16px;\">${article.category}</span>\n          <span>${article.reading_time} min read</span>\n        </div>\n      </td>\n    </tr>\n  `;\n}\n\n// Build HTML email\nconst html = `\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>HSE News Weekly - ${data.week_start} to ${data.week_end}</title>\n</head>\n<body style=\"margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f9fafb;\">\n  <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"background-color: #f9fafb; padding: 40px 20px;\">\n    <tr>\n      <td align=\"center\">\n        <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"600\" style=\"background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);\">\n          \n          <!-- Header -->\n          <tr>\n            <td style=\"background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); padding: 40px 32px; text-align: center;\">\n              <h1 style=\"margin: 0; color: #ffffff; font-size: 32px; font-weight: 700;\">HSE News Weekly</h1>\n              <p style=\"margin: 12px 0 0 0; color: #e0e7ff; font-size: 16px;\">Your Weekly Roundup: ${data.week_start} to ${data.week_end}</p>\n            </td>\n          </tr>\n\n          <!-- Summary Stats -->\n          <tr>\n            <td style=\"padding: 32px; background-color: #f9fafb;\">\n              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n                <tr>\n                  <td align=\"center\" style=\"padding: 16px;\">\n                    <div style=\"font-size: 36px; font-weight: 700; color: #3b82f6;\">${data.stats.total_articles}</div>\n                    <div style=\"font-size: 14px; color: #6b7280; margin-top: 4px;\">New Articles</div>\n                  </td>\n                  <td align=\"center\" style=\"padding: 16px;\">\n                    <div style=\"font-size: 36px; font-weight: 700; color: #8b5cf6;\">${data.stats.categories_covered}</div>\n                    <div style=\"font-size: 14px; color: #6b7280; margin-top: 4px;\">Categories</div>\n                  </td>\n                  <td align=\"center\" style=\"padding: 16px;\">\n                    <div style=\"font-size: 36px; font-weight: 700; color: #10b981;\">${data.stats.total_reading_time}</div>\n                    <div style=\"font-size: 14px; color: #6b7280; margin-top: 4px;\">Minutes Total</div>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- Featured Articles -->\n          <tr>\n            <td style=\"padding: 32px;\">\n              <h2 style=\"margin: 0 0 24px 0; font-size: 28px; font-weight: 600; color: #111827; border-bottom: 3px solid #3b82f6; padding-bottom: 12px;\">🌟 Most Read This Week</h2>\n              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n                ${data.featured.map(formatArticle).join('')}\n              </table>\n            </td>\n          </tr>\n\n          <!-- Quick Reads -->\n          <tr>\n            <td style=\"padding: 0 32px 32px 32px;\">\n              <h2 style=\"margin: 0 0 24px 0; font-size: 28px; font-weight: 600; color: #111827; border-bottom: 3px solid #8b5cf6; padding-bottom: 12px;\">⚡ Quick Reads (Under 5 Minutes)</h2>\n              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n                ${data.quick_reads.map(article => `\n                  <tr>\n                    <td style=\"padding: 12px 0; border-bottom: 1px solid #f3f4f6;\">\n                      <a href=\"${siteUrl}/articles/${article.slug}\" style=\"color: #3b82f6; text-decoration: none; font-size: 16px; font-weight: 500;\">${article.title}</a>\n                      <div style=\"margin-top: 4px; font-size: 14px; color: #9ca3af;\">${article.reading_time} min • ${article.category}</div>\n                    </td>\n                  </tr>\n                `).join('')}\n              </table>\n            </td>\n          </tr>\n\n          <!-- By Category -->\n          <tr>\n            <td style=\"padding: 0 32px 32px 32px; background-color: #f9fafb;\">\n              <h2 style=\"margin: 0 0 24px 0; font-size: 28px; font-weight: 600; color: #111827;\">📂 By Category</h2>\n              ${Object.entries(data.by_category).map(([category, articles]) => `\n                <div style=\"margin-bottom: 24px;\">\n                  <h3 style=\"margin: 0 0 12px 0; font-size: 20px; font-weight: 600; color: #374151;\">${category} (${articles.length})</h3>\n                  <ul style=\"margin: 0; padding: 0; list-style: none;\">\n                    ${articles.map(article => `\n                      <li style=\"padding: 8px 0; border-bottom: 1px solid #e5e7eb;\">\n                        <a href=\"${siteUrl}/articles/${article.slug}\" style=\"color: #3b82f6; text-decoration: none; font-size: 15px;\">${article.title}</a>\n                      </li>\n                    `).join('')}\n                  </ul>\n                </div>\n              `).join('')}\n            </td>\n          </tr>\n\n          <!-- CTA -->\n          <tr>\n            <td style=\"padding: 32px; text-align: center;\">\n              <a href=\"${siteUrl}\" style=\"display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: #ffffff; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600;\">Visit HSE News →</a>\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"padding: 32px; background-color: #f9fafb; text-align: center; font-size: 14px; color: #6b7280;\">\n              <p style=\"margin: 0 0 12px 0;\">You're receiving this because you subscribed to HSE News updates.</p>\n              <p style=\"margin: 0;\">\n                <a href=\"${siteUrl}/newsletter/preferences\" style=\"color: #3b82f6; text-decoration: none;\">Update preferences</a> • \n                <a href=\"${siteUrl}/newsletter/unsubscribe\" style=\"color: #6b7280; text-decoration: none;\">Unsubscribe</a>\n              </p>\n              <p style=\"margin: 16px 0 0 0; color: #9ca3af; font-size: 12px;\">© ${new Date().getFullYear()} HSE News. All rights reserved.</p>\n            </td>\n          </tr>\n\n        </table>\n      </td>\n    </tr>\n  </table>\n\n  <!-- Tracking Pixel -->\n  <img src=\"${siteUrl}/api/newsletter/track?issue=${data.week_end}\" width=\"1\" height=\"1\" alt=\"\" style=\"display: none;\">\n</body>\n</html>\n`;\n\nreturn {\n  json: {\n    ...data,\n    email_html: html,\n    email_subject: `HSE News Weekly: ${data.stats.total_articles} New Articles | ${data.week_start}`,\n    email_preview: `This week: ${data.featured[0].title} and ${data.stats.total_articles - 1} more articles`\n  }\n};"
+      },
+      "id": "build-email-html",
+      "name": "Build Email HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "tableId": "newsletter_subscribers",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "verified",
+              "condition": "equals",
+              "keyValue": "true"
+            },
+            {
+              "keyName": "active",
+              "condition": "equals",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "id": "get-subscribers",
+      "name": "Get Active Subscribers",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1050, 400],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const emailData = $('Build Email HTML').item.json;\nconst subscribers = $input.all();\n\nconst BATCH_SIZE = 500;\nconst batches = [];\n\nfor (let i = 0; i < subscribers.length; i += BATCH_SIZE) {\n  batches.push({\n    json: {\n      batch_number: Math.floor(i / BATCH_SIZE) + 1,\n      total_batches: Math.ceil(subscribers.length / BATCH_SIZE),\n      subscribers: subscribers.slice(i, i + BATCH_SIZE).map(s => s.json),\n      email_html: emailData.email_html,\n      email_subject: emailData.email_subject,\n      email_preview: emailData.email_preview\n    }\n  });\n}\n\nreturn batches;"
+      },
+      "id": "create-batches",
+      "name": "Create Send Batches (500 each)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.subscribers.map(s => s.email).join(',') }}",
+        "subject": "={{ $json.email_subject }}",
+        "emailType": "html",
+        "message": "={{ $json.email_html }}",
+        "options": {
+          "senderName": "HSE News",
+          "appendN8nAttribution": false
+        }
+      },
+      "id": "send-batch",
+      "name": "Send Email Batch",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1450, 400],
+      "credentials": {
+        "smtp": {
+          "id": "7",
+          "name": "SMTP Email Service"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "wait-between-batches",
+      "name": "Wait 2s Between Batches",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1650, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "const allBatches = $input.all();\nconst emailData = $('Build Email HTML').item.json;\n\nconst summary = {\n  workflow: 'Newsletter Compiler',\n  week_start: emailData.week_start,\n  week_end: emailData.week_end,\n  articles_included: emailData.stats.total_articles,\n  batches_sent: allBatches.length,\n  total_subscribers: allBatches.reduce((sum, batch) => sum + batch.json.subscribers.length, 0),\n  sent_at: new Date().toISOString()\n};\n\nconsole.log('Newsletter Summary:', summary);\n\n// Log to database\nawait $supabase\n  .from('newsletter_history')\n  .insert([{\n    week_start: emailData.week_start,\n    week_end: emailData.week_end,\n    articles_count: emailData.stats.total_articles,\n    subscribers_count: summary.total_subscribers,\n    sent_at: summary.sent_at,\n    email_subject: emailData.email_subject\n  }]);\n\nreturn [{ json: summary }];"
+      },
+      "id": "log-send-summary",
+      "name": "Log Newsletter Send",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 400]
+    }
+  ],
+  "connections": {
+    "Every Sunday 8 AM": {
+      "main": [
+        [
+          {
+            "node": "Get Last Week's Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Last Week's Articles": {
+      "main": [
+        [
+          {
+            "node": "Organize Newsletter Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Organize Newsletter Content": {
+      "main": [
+        [
+          {
+            "node": "Build Email HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email HTML": {
+      "main": [
+        [
+          {
+            "node": "Get Active Subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Create Send Batches (500 each)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Send Batches (500 each)": {
+      "main": [
+        [
+          {
+            "node": "Send Email Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Batch": {
+      "main": [
+        [
+          {
+            "node": "Wait 2s Between Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2s Between Batches": {
+      "main": [
+        [
+          {
+            "node": "Log Newsletter Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-01-05T00:00:00.000Z",
+  "versionId": "1"
+}

@@ -1,0 +1,456 @@
+{
+  "name": "2. AI Processing Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "workflow/ai-processing-trigger",
+        "options": {
+          "rawBody": false
+        },
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "ai-processing-trigger",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "Webhook Secret Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "tableId": "articles_queue",
+        "returnAll": false,
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "equals",
+              "keyValue": "={{ $json.body.queue_id }}"
+            }
+          ]
+        }
+      },
+      "id": "get-queue-item",
+      "name": "Get Queue Item",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-sonnet-20241022",
+        "prompt": "=You are a senior UK Health & Safety editor for a professional news publication. Your role is to transform source content into premium, publication-ready articles.\n\n**SOURCE CONTENT:**\nTitle: {{ $json.title }}\nSource: {{ $json.source }}\nPublished: {{ $json.source_published_date }}\nURL: {{ $json.original_url }}\n\nContent:\n{{ $json.raw_content }}\n\n**YOUR TASK:**\nRewrite this content as a complete, professional article following these guidelines:\n\n**WRITING STYLE:**\n- Professional but accessible tone suitable for safety professionals\n- UK English spelling and grammar (realise not realize, colour not color)\n- Active voice where possible\n- Clear, concise sentences (15-20 words average)\n- Avoid jargon unless industry-standard\n- Include relevant statistics and data points\n- Add context for regulations/standards mentioned (cite specific regulations)\n\n**STRUCTURE (MARKDOWN):**\n```markdown\n# [Compelling Headline - 60-70 characters]\n\n## Executive Summary\n[2-3 sentences capturing the key takeaway]\n\n## [Main Section 1 - Descriptive H2]\n[3-4 paragraphs with clear topic sentences]\n\n### [Subsection if needed - H3]\n[Supporting details, examples, data]\n\n## [Main Section 2 - Descriptive H2]\n[Continue with logical flow]\n\n## Key Takeaways\n- [Bullet point 1]\n- [Bullet point 2]\n- [Bullet point 3-5]\n\n## What This Means for Your Organisation\n[Practical implications paragraph]\n\n## Further Resources\n- [Relevant HSE guidance link]\n- [Related regulation/standard]\n```\n\n**CONTENT REQUIREMENTS:**\n- Minimum 800 words, target 1200-1500 words\n- Include relevant UK regulations (HSWA 1974, COSHH, CDM, RIDDOR, etc.)\n- Add industry context and expert perspective\n- Reference official guidance (HSE, IOSH, NEBOSH)\n- Include practical examples or case studies if applicable\n- Ensure factual accuracy - don't invent statistics\n\n**SEO OPTIMIZATION:**\n- Primary keyword in H1 and first 100 words\n- Related keywords naturally throughout\n- Descriptive H2/H3 headings\n- Meta description material in first 2 sentences\n\n**METADATA TO GENERATE:**\nAfter the article content, provide this data in JSON format:\n\n```json\n{\n  \"article_markdown\": \"[full article in markdown]\",\n  \"title\": \"[optimized title 60-70 chars]\",\n  \"slug\": \"[url-friendly-slug]\",\n  \"excerpt\": \"[compelling 150-160 character summary]\",\n  \"category\": \"[ONE: Workplace Safety | Regulations & Compliance | Risk Management | Occupational Health | Construction Safety | Environmental Health | Safety Technology | Training & Development | Industry News | Case Studies | Best Practices]\",\n  \"tags\": [\"tag1\", \"tag2\", \"tag3\", \"tag4\", \"tag5\"],\n  \"seo_keywords\": [\"keyword1\", \"keyword2\", \"keyword3\"],\n  \"priority\": \"[HIGH/MEDIUM/LOW based on: breaking news=HIGH, regulatory updates=HIGH, general updates=MEDIUM, evergreen content=LOW]\",\n  \"quality_score\": [0-10 based on: originality, depth, accuracy, usefulness],\n  \"target_audience\": \"[safety managers|construction professionals|HR professionals|environmental officers|general safety professionals]\",\n  \"reading_time\": [calculated: words / 200],\n  \"ai_processing_notes\": \"[brief notes on what you changed/added]\"\n}\n```\n\n**QUALITY STANDARDS:**\n- Accuracy: Verify all claims are from source\n- Completeness: Comprehensive coverage of topic\n- Clarity: Easily understood by target audience\n- Professionalism: Publication-ready quality\n- UK-focus: Relevant to UK safety professionals\n\n**RETURN FORMAT:**\nProvide ONLY the complete markdown article followed by the JSON metadata block. Do not include any other commentary.\n\nBegin processing now:",
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 4000
+        }
+      },
+      "id": "claude-rewrite",
+      "name": "Claude - Rewrite Article",
+      "type": "n8n-nodes-base.anthropic",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "credentials": {
+        "anthropicApi": {
+          "id": "3",
+          "name": "Anthropic Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const response = $input.item.json.response || $input.item.json.content;\n\n// Extract JSON metadata from response\nconst jsonMatch = response.match(/```json\\s*([\\s\\S]*?)\\s*```/);\n\nif (!jsonMatch) {\n  throw new Error('No JSON metadata found in Claude response');\n}\n\nconst metadata = JSON.parse(jsonMatch[1]);\n\n// Extract article content (everything before JSON block)\nlet articleContent = response.split('```json')[0].trim();\n\n// If article_markdown is in metadata, use that instead\nif (metadata.article_markdown) {\n  articleContent = metadata.article_markdown;\n}\n\n// Generate slug if not provided\nif (!metadata.slug) {\n  metadata.slug = metadata.title\n    .toLowerCase()\n    .replace(/[^a-z0-9\\s-]/g, '')\n    .replace(/\\s+/g, '-')\n    .substring(0, 100);\n}\n\n// Calculate reading time if not provided\nif (!metadata.reading_time) {\n  const wordCount = articleContent.split(/\\s+/).length;\n  metadata.reading_time = Math.ceil(wordCount / 200);\n}\n\nreturn {\n  json: {\n    ...metadata,\n    content: articleContent,\n    original_queue_id: $('Get Queue Item').item.json.id,\n    original_url: $('Get Queue Item').item.json.original_url,\n    source: $('Get Queue Item').item.json.source,\n    source_published_date: $('Get Queue Item').item.json.source_published_date\n  }\n};"
+      },
+      "id": "parse-response",
+      "name": "Parse Claude Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.unsplash.com/search/photos",
+        "options": {
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "query",
+                "value": "={{ $json.seo_keywords[0] }} workplace safety"
+              },
+              {
+                "name": "per_page",
+                "value": "3"
+              },
+              {
+                "name": "orientation",
+                "value": "landscape"
+              }
+            ]
+          },
+          "headers": {
+            "entries": [
+              {
+                "name": "Authorization",
+                "value": "Client-ID {{ $env.UNSPLASH_ACCESS_KEY }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "search-images",
+      "name": "Search Unsplash for Featured Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const images = $input.item.json.results || [];\nconst previousData = $('Parse Claude Response').item.json;\n\nlet featuredImageUrl = null;\nlet imageCredit = null;\n\nif (images.length > 0) {\n  const selectedImage = images[0];\n  featuredImageUrl = selectedImage.urls.regular;\n  imageCredit = {\n    photographer: selectedImage.user.name,\n    photographer_url: selectedImage.user.links.html,\n    source: 'Unsplash'\n  };\n}\n\nreturn {\n  json: {\n    ...previousData,\n    featured_image_url: featuredImageUrl,\n    image_credit: imageCredit\n  }\n};"
+      },
+      "id": "attach-image",
+      "name": "Attach Featured Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.quality_score }}",
+              "operation": "largerEqual",
+              "value2": 7
+            }
+          ]
+        }
+      },
+      "id": "quality-check",
+      "name": "Quality Score >= 7?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "articles",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $json.title }}"
+            },
+            {
+              "fieldId": "slug",
+              "fieldValue": "={{ $json.slug }}"
+            },
+            {
+              "fieldId": "content",
+              "fieldValue": "={{ $json.content }}"
+            },
+            {
+              "fieldId": "excerpt",
+              "fieldValue": "={{ $json.excerpt }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $json.category }}"
+            },
+            {
+              "fieldId": "tags",
+              "fieldValue": "={{ JSON.stringify($json.tags) }}"
+            },
+            {
+              "fieldId": "author",
+              "fieldValue": "HSE News AI"
+            },
+            {
+              "fieldId": "featured_image_url",
+              "fieldValue": "={{ $json.featured_image_url }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending_review"
+            },
+            {
+              "fieldId": "reading_time",
+              "fieldValue": "={{ $json.reading_time }}"
+            },
+            {
+              "fieldId": "ai_generated",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "quality_score",
+              "fieldValue": "={{ $json.quality_score }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $json.priority }}"
+            },
+            {
+              "fieldId": "original_source_url",
+              "fieldValue": "={{ $json.original_url }}"
+            },
+            {
+              "fieldId": "source",
+              "fieldValue": "={{ $json.source }}"
+            },
+            {
+              "fieldId": "seo_keywords",
+              "fieldValue": "={{ JSON.stringify($json.seo_keywords) }}"
+            }
+          ]
+        }
+      },
+      "id": "insert-article",
+      "name": "Insert to Articles (Pending Review)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1650, 200],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "articles_queue",
+        "filterType": "manual",
+        "matchBy": "id",
+        "valueId": "={{ $json.original_queue_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "processed"
+            },
+            {
+              "fieldId": "processed_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "article_id",
+              "fieldValue": "={{ $('Insert to Articles (Pending Review)').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "id": "update-queue-processed",
+      "name": "Mark Queue Item Processed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1850, 200],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "articles_queue",
+        "filterType": "manual",
+        "matchBy": "id",
+        "valueId": "={{ $json.original_queue_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "rejected_low_quality"
+            },
+            {
+              "fieldId": "processed_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "rejection_reason",
+              "fieldValue": "Quality score below threshold ({{ $json.quality_score }} < 7)"
+            }
+          ]
+        }
+      },
+      "id": "mark-rejected",
+      "name": "Mark as Rejected (Low Quality)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1650, 400],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, article_id: $('Insert to Articles (Pending Review)').item.json.id, status: 'pending_review' }) }}"
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2050, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, reason: 'low_quality', quality_score: $json.quality_score }) }}"
+      },
+      "id": "respond-rejected",
+      "name": "Respond Rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Queue Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Queue Item": {
+      "main": [
+        [
+          {
+            "node": "Claude - Rewrite Article",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - Rewrite Article": {
+      "main": [
+        [
+          {
+            "node": "Parse Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Claude Response": {
+      "main": [
+        [
+          {
+            "node": "Search Unsplash for Featured Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Unsplash for Featured Image": {
+      "main": [
+        [
+          {
+            "node": "Attach Featured Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Featured Image": {
+      "main": [
+        [
+          {
+            "node": "Quality Score >= 7?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quality Score >= 7?": {
+      "main": [
+        [
+          {
+            "node": "Insert to Articles (Pending Review)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark as Rejected (Low Quality)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert to Articles (Pending Review)": {
+      "main": [
+        [
+          {
+            "node": "Mark Queue Item Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Queue Item Processed": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Rejected (Low Quality)": {
+      "main": [
+        [
+          {
+            "node": "Respond Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-01-05T00:00:00.000Z",
+  "versionId": "1"
+}

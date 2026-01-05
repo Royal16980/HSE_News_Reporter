@@ -1,0 +1,395 @@
+{
+  "name": "1. Content Aggregation Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://press.hse.gov.uk/",
+        "options": {}
+      },
+      "id": "hse-press",
+      "name": "HSE Press Releases",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://www.gov.uk/search/news-and-communications?organisations[]=health-and-safety-executive",
+        "options": {}
+      },
+      "id": "gov-uk",
+      "name": "GOV.UK News",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://www.ioshmagazine.com/rss",
+        "options": {}
+      },
+      "id": "iosh-rss",
+      "name": "IOSH Magazine RSS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://www.constructionnews.co.uk/safety/feed/",
+        "options": {}
+      },
+      "id": "construction-rss",
+      "name": "Construction News RSS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 500]
+    },
+    {
+      "parameters": {
+        "url": "https://www.shponline.co.uk/feed/",
+        "options": {}
+      },
+      "id": "shp-rss",
+      "name": "SHP Online RSS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 600]
+    },
+    {
+      "parameters": {
+        "functionCode": "const items = [];\n\nfor (const item of $input.all()) {\n  const body = item.json.body || item.json;\n  \n  // Parse RSS/HTML based on source\n  let articles = [];\n  \n  if (typeof body === 'string') {\n    // RSS Feed parsing\n    const parser = new DOMParser();\n    const xmlDoc = parser.parseFromString(body, 'text/xml');\n    const itemNodes = xmlDoc.getElementsByTagName('item');\n    \n    for (const node of itemNodes) {\n      const titleNode = node.getElementsByTagName('title')[0];\n      const linkNode = node.getElementsByTagName('link')[0];\n      const descNode = node.getElementsByTagName('description')[0];\n      const pubDateNode = node.getElementsByTagName('pubDate')[0];\n      \n      if (titleNode && linkNode) {\n        articles.push({\n          title: titleNode.textContent.trim(),\n          url: linkNode.textContent.trim(),\n          excerpt: descNode ? descNode.textContent.trim().replace(/<[^>]*>/g, '').substring(0, 300) : '',\n          published_date: pubDateNode ? new Date(pubDateNode.textContent).toISOString() : new Date().toISOString(),\n          source: item.json.source || 'Unknown'\n        });\n      }\n    }\n  } else if (body.items && Array.isArray(body.items)) {\n    // JSON API response\n    articles = body.items.map(article => ({\n      title: article.title || '',\n      url: article.link || article.url || '',\n      excerpt: article.description || article.summary || '',\n      published_date: article.pubDate || article.published || new Date().toISOString(),\n      source: item.json.source || 'Unknown'\n    }));\n  }\n  \n  // Only include articles from last 7 days\n  const sevenDaysAgo = new Date();\n  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);\n  \n  articles = articles.filter(article => {\n    const pubDate = new Date(article.published_date);\n    return pubDate >= sevenDaysAgo;\n  });\n  \n  items.push(...articles.map(article => ({ json: article })));\n}\n\nreturn items;"
+      },
+      "id": "parse-content",
+      "name": "Parse & Extract Articles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "tableId": "articles",
+        "returnAll": false,
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "original_url",
+              "condition": "equals",
+              "keyValue": "={{ $json.url }}"
+            }
+          ]
+        }
+      },
+      "id": "check-duplicate",
+      "name": "Check if Exists in DB",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [850, 400],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "equals",
+              "value2": "0"
+            }
+          ]
+        }
+      },
+      "id": "if-not-exists",
+      "name": "If Not Duplicate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Fetch full article content via HTTP request\nconst url = $input.item.json.url;\n\nconst response = await fetch(url);\nconst html = await response.text();\n\n// Extract main content (basic extraction - adjust selectors as needed)\nconst parser = new DOMParser();\nconst doc = parser.parseFromString(html, 'text/html');\n\n// Try common article content selectors\nlet content = '';\nconst selectors = [\n  'article',\n  '.article-content',\n  '.post-content',\n  '.entry-content',\n  'main'\n];\n\nfor (const selector of selectors) {\n  const element = doc.querySelector(selector);\n  if (element) {\n    content = element.textContent.trim();\n    break;\n  }\n}\n\n// If no content found, use excerpt\nif (!content) {\n  content = $input.item.json.excerpt;\n}\n\n// Clean content\ncontent = content.replace(/\\s+/g, ' ').trim();\n\n// Extract images\nconst images = [];\nconst imgElements = doc.querySelectorAll('img');\nfor (const img of imgElements) {\n  const src = img.getAttribute('src');\n  if (src && (src.startsWith('http') || src.startsWith('//'))) {\n    images.push(src.startsWith('//') ? 'https:' + src : src);\n  }\n}\n\nreturn {\n  json: {\n    ...($input.item.json),\n    full_content: content,\n    images: images,\n    word_count: content.split(/\\s+/).length,\n    reading_time: Math.ceil(content.split(/\\s+/).length / 200)\n  }\n};"
+      },
+      "id": "fetch-full-content",
+      "name": "Fetch Full Article Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "articles_queue",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $json.title }}"
+            },
+            {
+              "fieldId": "original_url",
+              "fieldValue": "={{ $json.url }}"
+            },
+            {
+              "fieldId": "excerpt",
+              "fieldValue": "={{ $json.excerpt }}"
+            },
+            {
+              "fieldId": "source",
+              "fieldValue": "={{ $json.source }}"
+            },
+            {
+              "fieldId": "source_published_date",
+              "fieldValue": "={{ $json.published_date }}"
+            },
+            {
+              "fieldId": "raw_content",
+              "fieldValue": "={{ $json.full_content }}"
+            },
+            {
+              "fieldId": "images",
+              "fieldValue": "={{ JSON.stringify($json.images) }}"
+            },
+            {
+              "fieldId": "word_count",
+              "fieldValue": "={{ $json.word_count }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending_ai_processing"
+            }
+          ]
+        }
+      },
+      "id": "insert-to-queue",
+      "name": "Insert to Processing Queue",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1450, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_WEBHOOK_URL }}workflow/ai-processing-trigger",
+        "options": {
+          "headers": {
+            "entries": [
+              {
+                "name": "x-webhook-secret",
+                "value": "={{ $env.WEBHOOK_SECRET }}"
+              }
+            ]
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ queue_id: $json.id, trigger_source: 'content_aggregation' }) }}"
+      },
+      "id": "trigger-ai-processing",
+      "name": "Trigger AI Processing Workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const allItems = $input.all();\nconst newArticles = allItems.length;\nconst timestamp = new Date().toISOString();\n\nconst summary = {\n  workflow: 'Content Aggregation Engine',\n  timestamp: timestamp,\n  articles_found: newArticles,\n  sources_checked: 5,\n  status: 'completed'\n};\n\nconsole.log('Content Aggregation Summary:', summary);\n\nreturn [{ json: summary }];"
+      },
+      "id": "log-summary",
+      "name": "Log Execution Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 300]
+    }
+  ],
+  "connections": {
+    "Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "HSE Press Releases",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GOV.UK News",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IOSH Magazine RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Construction News RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SHP Online RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HSE Press Releases": {
+      "main": [
+        [
+          {
+            "node": "Parse & Extract Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GOV.UK News": {
+      "main": [
+        [
+          {
+            "node": "Parse & Extract Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IOSH Magazine RSS": {
+      "main": [
+        [
+          {
+            "node": "Parse & Extract Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construction News RSS": {
+      "main": [
+        [
+          {
+            "node": "Parse & Extract Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHP Online RSS": {
+      "main": [
+        [
+          {
+            "node": "Parse & Extract Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Extract Articles": {
+      "main": [
+        [
+          {
+            "node": "Check if Exists in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Exists in DB": {
+      "main": [
+        [
+          {
+            "node": "If Not Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Not Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Fetch Full Article Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Full Article Content": {
+      "main": [
+        [
+          {
+            "node": "Insert to Processing Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert to Processing Queue": {
+      "main": [
+        [
+          {
+            "node": "Trigger AI Processing Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger AI Processing Workflow": {
+      "main": [
+        [
+          {
+            "node": "Log Execution Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-01-05T00:00:00.000Z",
+  "versionId": "1"
+}

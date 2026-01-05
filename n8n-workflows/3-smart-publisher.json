@@ -1,0 +1,266 @@
+{
+  "name": "3. Smart Publisher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-hourly",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "tableId": "articles",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "equals",
+              "keyValue": "pending_review"
+            },
+            {
+              "keyName": "scheduled_publish_time",
+              "condition": "isNotNull"
+            },
+            {
+              "keyName": "scheduled_publish_time",
+              "condition": "smallerEqual",
+              "keyValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {
+          "sort": {
+            "values": [
+              {
+                "column": "priority",
+                "direction": "DESC"
+              },
+              {
+                "column": "scheduled_publish_time",
+                "direction": "ASC"
+              }
+            ]
+          }
+        }
+      },
+      "id": "get-scheduled",
+      "name": "Get Scheduled Articles",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const articles = $input.all();\nconst now = new Date();\nconst currentHour = now.getHours();\n\n// Get published count in last 24 hours\nconst oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);\nconst publishedToday = await $supabase\n  .from('articles')\n  .select('id', { count: 'exact' })\n  .eq('status', 'published')\n  .gte('published_at', oneDayAgo.toISOString());\n\nconst dailyCount = publishedToday.count || 0;\n\n// Get published count in last 3 hours\nconst threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);\nconst publishedRecently = await $supabase\n  .from('articles')\n  .select('id', { count: 'exact' })\n  .eq('status', 'published')\n  .gte('published_at', threeHoursAgo.toISOString());\n\nconst recentCount = publishedRecently.count || 0;\n\n// Publishing rules\nconst MAX_PER_DAY = 5;\nconst MAX_PER_3_HOURS = 3;\n\nif (dailyCount >= MAX_PER_DAY) {\n  return [];\n}\n\nif (recentCount >= MAX_PER_3_HOURS) {\n  return [];\n}\n\n// Filter articles based on time appropriateness\nconst appropriateArticles = articles.filter(item => {\n  const article = item.json;\n  \n  // Don't publish outside business hours (7am-7pm UK time) unless HIGH priority\n  if (currentHour < 7 || currentHour > 19) {\n    return article.priority === 'HIGH';\n  }\n  \n  return true;\n});\n\n// Limit to remaining quota\nconst remainingSlots = Math.min(\n  MAX_PER_DAY - dailyCount,\n  MAX_PER_3_HOURS - recentCount,\n  2 // Max 2 per execution\n);\n\nreturn appropriateArticles.slice(0, remainingSlots);"
+      },
+      "id": "apply-rules",
+      "name": "Apply Publishing Rules",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $input.all().length }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "has-articles",
+      "name": "Has Articles to Publish?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "articles",
+        "filterType": "manual",
+        "matchBy": "id",
+        "valueId": "={{ $json.id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "published"
+            },
+            {
+              "fieldId": "published_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "publish-article",
+      "name": "Update Status to Published",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1050, 200],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/revalidate",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ \n  secret: $env.REVALIDATE_SECRET,\n  path: '/articles/' + $json.slug\n}) }}"
+      },
+      "id": "revalidate-isr",
+      "name": "Revalidate ISR Cache",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_WEBHOOK_URL }}webhook/article-published",
+        "options": {
+          "headers": {
+            "entries": [
+              {
+                "name": "x-webhook-secret",
+                "value": "={{ $env.WEBHOOK_SECRET }}"
+              }
+            ]
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ \n  article_id: $json.id,\n  slug: $json.slug,\n  title: $json.title,\n  excerpt: $json.excerpt,\n  category: $json.category,\n  tags: $json.tags,\n  url: $env.NEXT_PUBLIC_SITE_URL + '/articles/' + $json.slug,\n  image_url: $json.featured_image_url\n}) }}"
+      },
+      "id": "trigger-distribution",
+      "name": "Trigger Social Media Distribution",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "const article = $input.item.json;\n\nconst logEntry = {\n  timestamp: new Date().toISOString(),\n  article_id: article.id,\n  title: article.title,\n  slug: article.slug,\n  priority: article.priority,\n  category: article.category,\n  action: 'published'\n};\n\nconsole.log('Article Published:', logEntry);\n\n// Insert to activity log\nawait $supabase\n  .from('activity_log')\n  .insert([{\n    event_type: 'article_published',\n    article_id: article.id,\n    metadata: logEntry\n  }]);\n\nreturn { json: logEntry };"
+      },
+      "id": "log-publication",
+      "name": "Log Publication Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 200]
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Get Scheduled Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Scheduled Articles": {
+      "main": [
+        [
+          {
+            "node": "Apply Publishing Rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Publishing Rules": {
+      "main": [
+        [
+          {
+            "node": "Has Articles to Publish?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Articles to Publish?": {
+      "main": [
+        [
+          {
+            "node": "Update Status to Published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Status to Published": {
+      "main": [
+        [
+          {
+            "node": "Revalidate ISR Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Revalidate ISR Cache": {
+      "main": [
+        [
+          {
+            "node": "Trigger Social Media Distribution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Social Media Distribution": {
+      "main": [
+        [
+          {
+            "node": "Log Publication Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-01-05T00:00:00.000Z",
+  "versionId": "1"
+}

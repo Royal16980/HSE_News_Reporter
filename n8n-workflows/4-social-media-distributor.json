@@ -1,0 +1,373 @@
+{
+  "name": "4. Social Media Distribution",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "webhook/article-published",
+        "options": {
+          "rawBody": false
+        },
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "id": "webhook-trigger",
+      "name": "Article Published Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 400],
+      "webhookId": "article-published",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "Webhook Secret Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = $input.item.json.body;\n\n// LinkedIn post format (max 3000 chars, but keep concise)\nconst linkedInPost = `${data.title}\n\n${data.excerpt}\n\nRead the full article: ${data.url}\n\n#HealthAndSafety #WorkplaceSafety #HSE #UKSafety #${data.category.replace(/\\s+/g, '')}`;\n\n// Twitter/X format (max 280 chars)\nconst twitterPost = `${data.title.substring(0, 200)}...\n\n${data.url}\n\n#HSE #WorkplaceSafety`;\n\n// Facebook post format (more casual, longer)\nconst facebookPost = `📢 New Article: ${data.title}\n\n${data.excerpt}\n\nStay informed about the latest in UK Health & Safety regulations and best practices.\n\n👉 Read more: ${data.url}\n\n#HealthAndSafety #WorkplaceSafety #UKSafety`;\n\nreturn {\n  json: {\n    ...data,\n    linkedin_post: linkedInPost,\n    twitter_post: twitterPost,\n    facebook_post: facebookPost\n  }\n};"
+      },
+      "id": "format-posts",
+      "name": "Format Platform-Specific Posts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "resource": "post",
+        "operation": "create",
+        "text": "={{ $json.linkedin_post }}",
+        "additionalFields": {
+          "visibility": "PUBLIC"
+        }
+      },
+      "id": "post-linkedin",
+      "name": "Post to LinkedIn",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [650, 200],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "4",
+          "name": "LinkedIn OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "tweet",
+        "operation": "create",
+        "text": "={{ $json.twitter_post }}"
+      },
+      "id": "post-twitter",
+      "name": "Post to Twitter/X",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [650, 400],
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "5",
+          "name": "Twitter OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "page",
+        "operation": "post",
+        "pageId": "={{ $env.FACEBOOK_PAGE_ID }}",
+        "content": "={{ $json.facebook_post }}",
+        "additionalFields": {
+          "link": "={{ $json.url }}"
+        }
+      },
+      "id": "post-facebook",
+      "name": "Post to Facebook Page",
+      "type": "n8n-nodes-base.facebook",
+      "typeVersion": 1,
+      "position": [650, 600],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "6",
+          "name": "Facebook Graph API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "social_media_posts",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "article_id",
+              "fieldValue": "={{ $('Format Platform-Specific Posts').item.json.article_id }}"
+            },
+            {
+              "fieldId": "platform",
+              "fieldValue": "linkedin"
+            },
+            {
+              "fieldId": "post_content",
+              "fieldValue": "={{ $('Format Platform-Specific Posts').item.json.linkedin_post }}"
+            },
+            {
+              "fieldId": "posted_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "platform_post_id",
+              "fieldValue": "={{ $json.id || $json.post_id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "posted"
+            }
+          ]
+        }
+      },
+      "id": "log-linkedin",
+      "name": "Log LinkedIn Post",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [850, 200],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "social_media_posts",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "article_id",
+              "fieldValue": "={{ $('Format Platform-Specific Posts').item.json.article_id }}"
+            },
+            {
+              "fieldId": "platform",
+              "fieldValue": "twitter"
+            },
+            {
+              "fieldId": "post_content",
+              "fieldValue": "={{ $('Format Platform-Specific Posts').item.json.twitter_post }}"
+            },
+            {
+              "fieldId": "posted_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "platform_post_id",
+              "fieldValue": "={{ $json.id_str || $json.id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "posted"
+            }
+          ]
+        }
+      },
+      "id": "log-twitter",
+      "name": "Log Twitter Post",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [850, 400],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "social_media_posts",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "article_id",
+              "fieldValue": "={{ $('Format Platform-Specific Posts').item.json.article_id }}"
+            },
+            {
+              "fieldId": "platform",
+              "fieldValue": "facebook"
+            },
+            {
+              "fieldId": "post_content",
+              "fieldValue": "={{ $('Format Platform-Specific Posts').item.json.facebook_post }}"
+            },
+            {
+              "fieldId": "posted_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "platform_post_id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "posted"
+            }
+          ]
+        }
+      },
+      "id": "log-facebook",
+      "name": "Log Facebook Post",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [850, 600],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const allPosts = $input.all();\n\nconst summary = {\n  article_id: $('Format Platform-Specific Posts').item.json.article_id,\n  article_title: $('Format Platform-Specific Posts').item.json.title,\n  platforms_posted: allPosts.length,\n  timestamp: new Date().toISOString(),\n  linkedin_success: allPosts.some(p => p.json.platform === 'linkedin'),\n  twitter_success: allPosts.some(p => p.json.platform === 'twitter'),\n  facebook_success: allPosts.some(p => p.json.platform === 'facebook')\n};\n\nconsole.log('Social Media Distribution Summary:', summary);\n\nreturn [{ json: summary }];"
+      },
+      "id": "create-summary",
+      "name": "Create Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    }
+  ],
+  "connections": {
+    "Article Published Webhook": {
+      "main": [
+        [
+          {
+            "node": "Format Platform-Specific Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Platform-Specific Posts": {
+      "main": [
+        [
+          {
+            "node": "Post to LinkedIn",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to Twitter/X",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to Facebook Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Log LinkedIn Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Twitter/X": {
+      "main": [
+        [
+          {
+            "node": "Log Twitter Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Facebook Page": {
+      "main": [
+        [
+          {
+            "node": "Log Facebook Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log LinkedIn Post": {
+      "main": [
+        [
+          {
+            "node": "Create Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Twitter Post": {
+      "main": [
+        [
+          {
+            "node": "Create Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Facebook Post": {
+      "main": [
+        [
+          {
+            "node": "Create Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Summary": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-01-05T00:00:00.000Z",
+  "versionId": "1"
+}

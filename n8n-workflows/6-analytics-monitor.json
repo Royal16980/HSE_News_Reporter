@@ -1,0 +1,410 @@
+{
+  "name": "6. Analytics Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-daily",
+      "name": "Every Day 9 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Articles published yesterday\nSELECT \n  COUNT(*) as articles_published,\n  SUM(views_count) as total_views,\n  AVG(views_count) as avg_views,\n  SUM(reading_time) as total_reading_time\nFROM articles\nWHERE published_at >= NOW() - INTERVAL '1 day'\n  AND published_at < NOW()\n  AND status = 'published';"
+      },
+      "id": "query-yesterday-stats",
+      "name": "Yesterday's Article Stats",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Top performing articles (last 24 hours)\nSELECT \n  id, title, slug, category, views_count, published_at\nFROM articles\nWHERE published_at >= NOW() - INTERVAL '1 day'\n  AND status = 'published'\nORDER BY views_count DESC\nLIMIT 5;"
+      },
+      "id": "query-top-articles",
+      "name": "Top 5 Articles (24h)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [450, 500],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Newsletter subscribers growth\nSELECT \n  COUNT(*) as total_subscribers,\n  COUNT(*) FILTER (WHERE verified = true) as verified_subscribers,\n  COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day') as new_yesterday\nFROM newsletter_subscribers\nWHERE active = true;"
+      },
+      "id": "query-subscribers",
+      "name": "Newsletter Subscriber Stats",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [450, 700],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Category performance (last 7 days)\nSELECT \n  category,\n  COUNT(*) as article_count,\n  SUM(views_count) as total_views,\n  AVG(views_count) as avg_views_per_article\nFROM articles\nWHERE published_at >= NOW() - INTERVAL '7 days'\n  AND status = 'published'\nGROUP BY category\nORDER BY total_views DESC;"
+      },
+      "id": "query-categories",
+      "name": "Category Performance (7d)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [450, 900],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Social media performance (last 7 days)\nSELECT \n  platform,\n  COUNT(*) as posts_count,\n  COUNT(*) FILTER (WHERE status = 'posted') as successful_posts\nFROM social_media_posts\nWHERE posted_at >= NOW() - INTERVAL '7 days'\nGROUP BY platform;"
+      },
+      "id": "query-social",
+      "name": "Social Media Performance (7d)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [450, 1100],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- AI processing stats (last 7 days)\nSELECT \n  COUNT(*) as total_processed,\n  COUNT(*) FILTER (WHERE status = 'processed') as successful,\n  COUNT(*) FILTER (WHERE status = 'rejected_low_quality') as rejected,\n  AVG(EXTRACT(EPOCH FROM (processed_at - created_at))) as avg_processing_time_seconds\nFROM articles_queue\nWHERE created_at >= NOW() - INTERVAL '7 days';"
+      },
+      "id": "query-ai-stats",
+      "name": "AI Processing Stats (7d)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [450, 1300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const yesterdayStats = $('Yesterday\\'s Article Stats').item.json[0] || {};\nconst topArticles = $('Top 5 Articles (24h)').all().map(item => item.json);\nconst subscribers = $('Newsletter Subscriber Stats').item.json[0] || {};\nconst categories = $('Category Performance (7d)').all().map(item => item.json);\nconst social = $('Social Media Performance (7d)').all().map(item => item.json);\nconst aiStats = $('AI Processing Stats (7d)').item.json[0] || {};\n\nconst yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);\nconst dateStr = yesterday.toISOString().split('T')[0];\n\n// Calculate key metrics\nconst metrics = {\n  date: dateStr,\n  articles: {\n    published_yesterday: yesterdayStats.articles_published || 0,\n    total_views_yesterday: yesterdayStats.total_views || 0,\n    avg_views_per_article: Math.round(yesterdayStats.avg_views || 0),\n    top_performers: topArticles\n  },\n  subscribers: {\n    total: subscribers.total_subscribers || 0,\n    verified: subscribers.verified_subscribers || 0,\n    new_yesterday: subscribers.new_yesterday || 0,\n    growth_rate: subscribers.total_subscribers > 0 \n      ? ((subscribers.new_yesterday / subscribers.total_subscribers) * 100).toFixed(2) + '%'\n      : '0%'\n  },\n  categories: categories,\n  social_media: social,\n  ai_processing: {\n    total_processed_7d: aiStats.total_processed || 0,\n    successful: aiStats.successful || 0,\n    rejected: aiStats.rejected || 0,\n    success_rate: aiStats.total_processed > 0\n      ? ((aiStats.successful / aiStats.total_processed) * 100).toFixed(1) + '%'\n      : '0%',\n    avg_processing_time: Math.round(aiStats.avg_processing_time_seconds || 0) + 's'\n  }\n};\n\n// Health check\nconst health = {\n  status: 'healthy',\n  warnings: [],\n  errors: []\n};\n\n// Check for issues\nif (metrics.articles.published_yesterday === 0) {\n  health.warnings.push('No articles published yesterday');\n  health.status = 'warning';\n}\n\nif (metrics.articles.avg_views_per_article < 10 && metrics.articles.published_yesterday > 0) {\n  health.warnings.push('Low average views per article');\n}\n\nif (parseFloat(metrics.ai_processing.success_rate) < 70) {\n  health.errors.push('AI processing success rate below 70%');\n  health.status = 'error';\n}\n\nif (metrics.subscribers.new_yesterday === 0) {\n  health.warnings.push('No new subscribers yesterday');\n  if (health.status === 'healthy') health.status = 'warning';\n}\n\nreturn [{\n  json: {\n    metrics: metrics,\n    health: health,\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "compile-report",
+      "name": "Compile Analytics Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 700]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = $input.item.json;\nconst metrics = data.metrics;\nconst health = data.health;\n\n// Build text report\nconst report = `\n📊 HSE News - Daily Analytics Report\n${metrics.date}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n📰 ARTICLES (Yesterday)\n• Published: ${metrics.articles.published_yesterday}\n• Total Views: ${metrics.articles.total_views_yesterday}\n• Avg Views/Article: ${metrics.articles.avg_views_per_article}\n\n🏆 TOP PERFORMERS (24h)\n${metrics.articles.top_performers.map((a, i) => \n  `${i + 1}. ${a.title} (${a.views_count} views)`\n).join('\\n')}\n\n📧 NEWSLETTER SUBSCRIBERS\n• Total Active: ${metrics.subscribers.total}\n• Verified: ${metrics.subscribers.verified}\n• New Yesterday: ${metrics.subscribers.new_yesterday}\n• Growth Rate: ${metrics.subscribers.growth_rate}\n\n📂 CATEGORY PERFORMANCE (7 days)\n${metrics.categories.map(c => \n  `• ${c.category}: ${c.article_count} articles, ${c.total_views} views`\n).join('\\n')}\n\n📱 SOCIAL MEDIA (7 days)\n${metrics.social_media.map(s => \n  `• ${s.platform.toUpperCase()}: ${s.successful_posts}/${s.posts_count} posted`\n).join('\\n')}\n\n🤖 AI PROCESSING (7 days)\n• Total Processed: ${metrics.ai_processing.total_processed_7d}\n• Success Rate: ${metrics.ai_processing.success_rate}\n• Avg Processing Time: ${metrics.ai_processing.avg_processing_time}\n• Rejected: ${metrics.ai_processing.rejected}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🏥 SYSTEM HEALTH: ${health.status.toUpperCase()}\n\n${health.warnings.length > 0 ? '⚠️ WARNINGS:\\n' + health.warnings.map(w => `• ${w}`).join('\\n') : ''}\n${health.errors.length > 0 ? '❌ ERRORS:\\n' + health.errors.map(e => `• ${e}`).join('\\n') : ''}\n${health.status === 'healthy' ? '✅ All systems operating normally' : ''}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nGenerated: ${data.generated_at}\n`;\n\nreturn {\n  json: {\n    ...data,\n    report_text: report\n  }\n};"
+      },
+      "id": "format-report",
+      "name": "Format Report for Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [950, 700]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $env.ADMIN_EMAIL }}",
+        "subject": "HSE News Daily Analytics - {{ $json.metrics.date }} [{{ $json.health.status.toUpperCase() }}]",
+        "emailType": "text",
+        "message": "={{ $json.report_text }}",
+        "options": {
+          "senderName": "HSE News Analytics"
+        }
+      },
+      "id": "send-email-report",
+      "name": "Send Email Report to Admin",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1150, 700],
+      "credentials": {
+        "smtp": {
+          "id": "7",
+          "name": "SMTP Email Service"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "analytics_reports",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "report_date",
+              "fieldValue": "={{ $json.metrics.date }}"
+            },
+            {
+              "fieldId": "report_type",
+              "fieldValue": "daily"
+            },
+            {
+              "fieldId": "metrics",
+              "fieldValue": "={{ JSON.stringify($json.metrics) }}"
+            },
+            {
+              "fieldId": "health_status",
+              "fieldValue": "={{ $json.health.status }}"
+            },
+            {
+              "fieldId": "warnings",
+              "fieldValue": "={{ JSON.stringify($json.health.warnings) }}"
+            },
+            {
+              "fieldId": "errors",
+              "fieldValue": "={{ JSON.stringify($json.health.errors) }}"
+            },
+            {
+              "fieldId": "generated_at",
+              "fieldValue": "={{ $json.generated_at }}"
+            }
+          ]
+        }
+      },
+      "id": "save-report",
+      "name": "Save Report to Database",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1350, 700],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase HSE News"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Compile Analytics Report').item.json.health.status }}",
+              "operation": "equals",
+              "value2": "error"
+            }
+          ]
+        }
+      },
+      "id": "check-errors",
+      "name": "Has Critical Errors?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1550, 700]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = $('Compile Analytics Report').item.json;\n\nconsole.error('CRITICAL: Analytics health check failed');\nconsole.error('Status:', data.health.status);\nconsole.error('Errors:', data.health.errors);\nconsole.error('Warnings:', data.health.warnings);\n\n// Could trigger additional alerts here (Slack, Discord, SMS, etc.)\n\nreturn { json: data };"
+      },
+      "id": "alert-critical",
+      "name": "Alert Critical Issues",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1750, 600]
+    }
+  ],
+  "connections": {
+    "Every Day 9 AM": {
+      "main": [
+        [
+          {
+            "node": "Yesterday's Article Stats",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Top 5 Articles (24h)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Newsletter Subscriber Stats",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Category Performance (7d)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Social Media Performance (7d)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AI Processing Stats (7d)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Yesterday's Article Stats": {
+      "main": [
+        [
+          {
+            "node": "Compile Analytics Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Top 5 Articles (24h)": {
+      "main": [
+        [
+          {
+            "node": "Compile Analytics Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Newsletter Subscriber Stats": {
+      "main": [
+        [
+          {
+            "node": "Compile Analytics Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Category Performance (7d)": {
+      "main": [
+        [
+          {
+            "node": "Compile Analytics Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Social Media Performance (7d)": {
+      "main": [
+        [
+          {
+            "node": "Compile Analytics Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Processing Stats (7d)": {
+      "main": [
+        [
+          {
+            "node": "Compile Analytics Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile Analytics Report": {
+      "main": [
+        [
+          {
+            "node": "Format Report for Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Report for Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email Report to Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Report to Admin": {
+      "main": [
+        [
+          {
+            "node": "Save Report to Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Report to Database": {
+      "main": [
+        [
+          {
+            "node": "Has Critical Errors?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Critical Errors?": {
+      "main": [
+        [
+          {
+            "node": "Alert Critical Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-01-05T00:00:00.000Z",
+  "versionId": "1"
+}
