@@ -32,7 +32,7 @@ const config: Config = {
         'status-pending': '#F59E0B',
         'status-scheduled': '#8B5CF6',
       },
-      fontFamily': {
+      fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       boxShadow: {
