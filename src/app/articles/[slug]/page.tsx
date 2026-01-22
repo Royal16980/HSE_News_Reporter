@@ -300,25 +300,7 @@ export default async function ArticlePage({
                 </p>
               </div>
 
-              {/* Quick Share */}
-              <div className="rounded-lg border bg-card p-6">
-                <h3 className="mb-3 font-semibold">Share Article</h3>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    if (navigator.share) {
-                      navigator.share({
-                        title: article.title,
-                        url: articleUrl,
-                      })
-                    }
-                  }}
-                >
-                  <Share2 className="mr-2 h-4 w-4" />
-                  Share
-                </Button>
-              </div>
+              {/* Quick Share - Using ShareButtons component below */}
             </aside>
           </div>
         </div>

@@ -7,6 +7,7 @@ import {
   FileText,
   CheckCircle,
   Clock,
+  Eye,
   Calendar,
 } from 'lucide-react'
 import { MetricCard } from '@/components/analytics/MetricCard'
@@ -19,14 +20,12 @@ import {
   type ViewsData,
 } from '@/lib/api/analytics'
 import { triggerHaptic } from '@/lib/haptics'
-import { usePullToRefresh } from '@/lib/gestures/usePullToRefresh'
 
 export default function AnalyticsPage() {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
   const [viewsData, setViewsData] = useState<ViewsData[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const loadAnalytics = async (isRefresh = false) => {
     try {
@@ -44,14 +43,12 @@ export default function AnalyticsPage() {
 
       setOverview(overviewData)
       setViewsData(viewsChartData)
-      setError(null)
 
       if (isRefresh) {
         triggerHaptic('success')
       }
     } catch (error) {
       console.error('Error loading analytics:', error)
-      setError('Unable to load analytics right now.')
       triggerHaptic('error')
     } finally {
       setLoading(false)
@@ -63,50 +60,19 @@ export default function AnalyticsPage() {
     loadAnalytics()
   }, [])
 
-  const { containerRef, pullDistance, isRefreshing } = usePullToRefresh(() => loadAnalytics(true), {
-    disabled: loading,
-  })
-
-  if (loading && !overview) {
+  if (loading || !overview) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-        <div className="px-6 pt-8 pb-6 bg-gradient-to-b from-safety-blue to-blue-600">
-          <div className="h-8 w-36 rounded-full bg-white/30 animate-pulse" />
-          <div className="mt-3 h-4 w-44 rounded-full bg-white/20 animate-pulse" />
-        </div>
-        <div className="px-6 py-6 space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div
-                key={`metric-skeleton-${index}`}
-                className="rounded-2xl bg-white dark:bg-gray-900 p-4 shadow-card animate-pulse"
-              >
-                <div className="h-4 w-20 rounded-full bg-gray-200 dark:bg-gray-800" />
-                <div className="mt-4 h-8 w-24 rounded-full bg-gray-200 dark:bg-gray-800" />
-              </div>
-            ))}
-          </div>
-          <div className="rounded-2xl bg-white dark:bg-gray-900 p-6 shadow-card animate-pulse">
-            <div className="h-4 w-28 rounded-full bg-gray-200 dark:bg-gray-800" />
-            <div className="mt-6 h-40 rounded-xl bg-gray-200 dark:bg-gray-800" />
-          </div>
-          <div className="rounded-2xl bg-white dark:bg-gray-900 p-6 shadow-card animate-pulse">
-            <div className="h-4 w-32 rounded-full bg-gray-200 dark:bg-gray-800" />
-            <div className="mt-6 h-32 rounded-xl bg-gray-200 dark:bg-gray-800" />
-          </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-safety-blue border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-600 dark:text-gray-400">Loading analytics...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div ref={containerRef} className="pb-safe-bottom">
-      <div
-        className="flex items-center justify-center text-xs text-gray-500 dark:text-gray-400"
-        style={{ height: pullDistance }}
-      >
-        {isRefreshing || refreshing ? 'Refreshing analytics...' : pullDistance > 10 ? 'Release to refresh' : ''}
-      </div>
+    <div className="pb-safe-bottom">
       {/* Header */}
       <div className="px-6 pt-8 pb-6 bg-gradient-to-b from-safety-blue to-blue-600">
         <div className="flex items-center justify-between">
@@ -117,8 +83,7 @@ export default function AnalyticsPage() {
           <button
             onClick={() => loadAnalytics(true)}
             disabled={refreshing}
-            className="p-3 rounded-xl bg-white/20 backdrop-blur-sm active:scale-95 transition-transform disabled:opacity-50"
-            aria-label="Refresh analytics"
+            className="p-3 rounded-xl bg-white/20 backdrop-blur-sm active:scale-95 transition-transform"
           >
             <TrendingUp
               className={`w-6 h-6 text-white ${refreshing ? 'animate-spin' : ''}`}
@@ -128,19 +93,6 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="px-6 py-6 space-y-6">
-        {error && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-200">
-            <div className="flex items-center justify-between">
-              <span>{error}</span>
-              <button
-                onClick={() => loadAnalytics(true)}
-                className="text-xs font-semibold text-red-700 underline dark:text-red-200"
-              >
-                Retry
-              </button>
-            </div>
-          </div>
-        )}
         {/* Key Metrics */}
         <div className="grid grid-cols-2 gap-4">
           <MetricCard

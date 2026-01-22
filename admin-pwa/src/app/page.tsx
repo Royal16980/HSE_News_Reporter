@@ -17,17 +17,17 @@ export default function HomePage() {
         </p>
         <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
           <Link
-            href="/login"
+            href="/analytics"
             className="flex items-center justify-center gap-2 rounded-button bg-safety-blue px-5 py-3 font-semibold text-white shadow-card transition hover:bg-safety-blue-600"
           >
-            Go to login
+            Open Dashboard
             <ArrowRight className="h-5 w-5" />
           </Link>
           <Link
             href="/review"
             className="rounded-button border border-gray-200 bg-white px-5 py-3 font-semibold text-gray-800 shadow-sm transition hover:border-safety-blue hover:text-safety-blue dark:border-gray-800 dark:bg-gray-900 dark:text-white"
           >
-            Open review queue
+            Review Queue
           </Link>
         </div>
       </div>

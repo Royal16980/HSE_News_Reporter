@@ -1,113 +1,155 @@
 'use client'
 
 import { create } from 'zustand'
-import { getSupabaseClient } from '@/lib/supabase'
-import { queueAction, type ArticleActionType } from '@/lib/offline-queue'
+import { queueAction, getQueuedActions, clearQueuedAction, type ArticleActionType } from '@/lib/offline-queue'
+import {
+  fetchPendingArticles,
+  approveArticle,
+  rejectArticle,
+  snoozeArticle,
+  updateArticle,
+} from '@/lib/api/articles'
 import type { Article } from '@/types'
+import { triggerHaptic } from '@/lib/haptics'
 
 type ArticlesState = {
   queue: Article[]
   loading: boolean
   error?: string
   fetchQueue: () => Promise<void>
-  handleAction: (articleId: string, action: ArticleActionType, payload?: Record<string, unknown>) => Promise<void>
+  syncQueuedActions: () => Promise<void>
+  handleAction: (
+    articleId: string,
+    action: ArticleActionType,
+    payload?: Record<string, unknown>
+  ) => Promise<void>
   removeFromQueue: (articleId: string) => void
+  updateArticleInQueue: (articleId: string, updates: Partial<Article>) => void
 }
 
-const seedArticles: Article[] = [
-  {
-    id: '1',
-    title: 'New Safety Regulations for Construction Sites',
-    excerpt: 'The UK has introduced updated safety regulations aimed at reducing on-site incidents by 20% over the next year.',
-    category: 'Regulation',
-    priority: 5,
-    qualityScore: 88,
-    status: 'pending_review',
-    imageUrl: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80',
-    createdAt: new Date().toISOString(),
-    source: 'HSE',
-  },
-  {
-    id: '2',
-    title: 'Warehouse Fire Drill Best Practices',
-    excerpt: 'A checklist for running effective fire drills that prepare staff and reduce evacuation times.',
-    category: 'Best Practice',
-    priority: 4,
-    qualityScore: 82,
-    status: 'pending_review',
-    imageUrl: 'https://images.unsplash.com/photo-1474224017046-182ece80b263?auto=format&fit=crop&w=1200&q=80',
-    createdAt: new Date().toISOString(),
-    source: 'HSE',
-  },
-  {
-    id: '3',
-    title: 'Case Study: Reducing Slips and Trips in Retail',
-    excerpt: 'How one retailer cut slip incidents by 60% with simple floor checks and training.',
-    category: 'Case Study',
-    priority: 3,
-    qualityScore: 76,
-    status: 'pending_review',
-    imageUrl: 'https://images.unsplash.com/photo-1433838552652-f9a46b332c40?auto=format&fit=crop&w=1200&q=80',
-    createdAt: new Date().toISOString(),
-    source: 'Industry',
-  },
-]
-
 export const useArticlesStore = create<ArticlesState>((set, get) => ({
-  queue: seedArticles,
+  queue: [],
   loading: false,
+
   async fetchQueue() {
     set({ loading: true, error: undefined })
     try {
-      // Placeholder: would call Supabase in production
-      void getSupabaseClient()
-      // Example fetch (kept commented until API is ready)
-      // const { data, error } = await client
-      //   .from('articles')
-      //   .select('*')
-      //   .eq('status', 'pending_review')
-      //   .order('priority', { ascending: false })
-      //   .order('created_at', { ascending: true })
+      const articles = await fetchPendingArticles()
+      set({ queue: articles })
 
-      // if (error) throw error
-      // set({ queue: data as Article[] })
+      // Trigger success haptic
+      triggerHaptic('light')
     } catch (error: any) {
+      console.error('Error fetching queue:', error)
       set({ error: error.message })
+      triggerHaptic('error')
     } finally {
       set({ loading: false })
     }
   },
+
+  async syncQueuedActions() {
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine
+    if (isOffline) return
+
+    const queued = await getQueuedActions()
+    if (!queued.length) return
+
+    for (const action of queued) {
+      if (!action.id) continue
+      try {
+        switch (action.type) {
+          case 'approve':
+            await approveArticle(action.articleId, (action.payload?.userId as string) || 'system')
+            break
+          case 'reject':
+            await rejectArticle(action.articleId, action.payload?.reason as string)
+            break
+          case 'snooze':
+            await snoozeArticle(action.articleId, action.payload?.snoozeUntil as Date | undefined)
+            break
+          case 'schedule':
+          case 'update':
+            await updateArticle(action.articleId, action.payload as Partial<Article>)
+            break
+          default:
+            break
+        }
+
+        await clearQueuedAction(action.id)
+      } catch (error) {
+        console.error('Error syncing offline action:', error)
+        set({ error: (error as Error).message })
+        break
+      }
+    }
+  },
+
   async handleAction(articleId, action, payload) {
     const { queue } = get()
     const article = queue.find((item) => item.id === articleId)
     if (!article) return
 
-    const client = getSupabaseClient()
-    void client
+    // Check if offline
     const isOffline = typeof navigator !== 'undefined' && !navigator.onLine
 
     if (isOffline) {
+      // Queue for later sync
       await queueAction({ articleId, type: action, payload })
       set({ queue: queue.filter((item) => item.id !== articleId) })
+      triggerHaptic('light')
       return
     }
 
     try {
-      set({ loading: true })
-      // Placeholder: call Supabase RPC/update
-      // const { error } = await client
-      //   .from('articles')
-      //   .update({ status: action })
-      //   .eq('id', articleId)
-      // if (error) throw error
+      // Optimistically remove from queue
       set({ queue: queue.filter((item) => item.id !== articleId) })
+
+      // Perform action based on type
+      switch (action) {
+        case 'approve':
+          await approveArticle(articleId, payload?.userId as string || 'system')
+          triggerHaptic('success')
+          break
+
+        case 'reject':
+          await rejectArticle(articleId, payload?.reason as string)
+          triggerHaptic('heavy')
+          break
+
+        case 'snooze':
+          const snoozeUntil = payload?.snoozeUntil as Date | undefined
+          await snoozeArticle(articleId, snoozeUntil)
+          triggerHaptic('medium')
+          break
+
+        case 'update':
+          await updateArticle(articleId, payload as Partial<Article>)
+          triggerHaptic('light')
+          break
+
+        default:
+          console.warn('Unknown action:', action)
+      }
     } catch (error: any) {
+      console.error('Error handling action:', error)
+
+      // Revert optimistic update on error
+      set({ queue: [...get().queue, article] })
       set({ error: error.message })
-    } finally {
-      set({ loading: false })
+      triggerHaptic('error')
     }
   },
+
   removeFromQueue(articleId) {
     set({ queue: get().queue.filter((item) => item.id !== articleId) })
+  },
+
+  updateArticleInQueue(articleId, updates) {
+    set({
+      queue: get().queue.map((article) =>
+        article.id === articleId ? { ...article, ...updates } : article
+      ),
+    })
   },
 }))

@@ -13,6 +13,14 @@ import { TRUST_INDICATORS } from '@/lib/constants'
  */
 export function HeroSection() {
   const [searchQuery, setSearchQuery] = React.useState('')
+  const [windowSize, setWindowSize] = React.useState({ width: 1200, height: 800 })
+
+  React.useEffect(() => {
+    // Set window size only on client side
+    if (typeof window !== 'undefined') {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight })
+    }
+  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,8 +41,8 @@ export function HeroSection() {
             key={i}
             className="absolute h-2 w-2 rounded-full bg-primary/30"
             initial={{
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight,
+              x: Math.random() * windowSize.width,
+              y: Math.random() * windowSize.height,
             }}
             animate={{
               y: [0, -100, 0],

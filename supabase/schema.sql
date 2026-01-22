@@ -549,3 +549,123 @@ BEGIN
   RETURN metrics;
 END;
 $$ LANGUAGE plpgsql;
+
+-- ==================================================
+-- RSS SOURCES & WORKFLOW TRACKING
+-- ==================================================
+
+-- RSS Sources table - Manage RSS feeds for content aggregation
+CREATE TABLE IF NOT EXISTS rss_sources (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(100) NOT NULL,
+  url TEXT NOT NULL UNIQUE,
+  category VARCHAR(100) REFERENCES categories(slug) ON UPDATE CASCADE,
+  is_active BOOLEAN DEFAULT TRUE,
+  check_frequency_hours INTEGER DEFAULT 6,
+  last_checked_at TIMESTAMP WITH TIME ZONE,
+  last_article_found_at TIMESTAMP WITH TIME ZONE,
+  articles_found_count INTEGER DEFAULT 0,
+  error_count INTEGER DEFAULT 0,
+  last_error TEXT,
+  priority INTEGER DEFAULT 5 CHECK (priority >= 1 AND priority <= 10),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rss_active ON rss_sources(is_active);
+CREATE INDEX IF NOT EXISTS idx_rss_last_checked ON rss_sources(last_checked_at);
+
+-- Insert default HSE RSS sources
+INSERT INTO rss_sources (name, url, category, priority) VALUES
+  ('HSE Gov UK News', 'https://www.hse.gov.uk/news/rss.xml', 'regulations', 10),
+  ('IOSH Magazine', 'https://www.ioshmagazine.com/rss.xml', 'workplace-safety', 8),
+  ('Safety & Health Practitioner', 'https://www.shponline.co.uk/feed/', 'workplace-safety', 8),
+  ('Construction Enquirer Safety', 'https://www.constructionenquirer.com/category/health-safety/feed/', 'construction', 7),
+  ('Fire Safety Matters', 'https://www.firesafetymatters.co.uk/feed/', 'fire-safety', 7),
+  ('Food Safety News', 'https://www.foodsafetynews.com/feed/', 'food-safety', 6)
+ON CONFLICT (url) DO NOTHING;
+
+-- Workflow Runs table - Track n8n workflow executions
+CREATE TABLE IF NOT EXISTS workflow_runs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workflow_id VARCHAR(100) NOT NULL,
+  workflow_name VARCHAR(255) NOT NULL,
+  execution_id VARCHAR(255),
+  status VARCHAR(50) NOT NULL CHECK (status IN ('started', 'running', 'completed', 'failed', 'cancelled')),
+  started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  finished_at TIMESTAMP WITH TIME ZONE,
+  duration_ms INTEGER,
+  items_processed INTEGER DEFAULT 0,
+  items_created INTEGER DEFAULT 0,
+  items_failed INTEGER DEFAULT 0,
+  error_message TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow ON workflow_runs(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status);
+
+-- Publishing Schedule table
+CREATE TABLE IF NOT EXISTS publishing_schedule (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  article_id UUID NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+  scheduled_time TIMESTAMP WITH TIME ZONE NOT NULL,
+  publish_channels TEXT[] DEFAULT ARRAY['website'],
+  status VARCHAR(50) DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'published', 'cancelled', 'failed')),
+  published_at TIMESTAMP WITH TIME ZONE,
+  retry_count INTEGER DEFAULT 0,
+  last_error TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_schedule_time ON publishing_schedule(scheduled_time);
+CREATE INDEX IF NOT EXISTS idx_schedule_status ON publishing_schedule(status);
+
+-- System Configuration table
+CREATE TABLE IF NOT EXISTS system_config (
+  key VARCHAR(100) PRIMARY KEY,
+  value JSONB NOT NULL,
+  description TEXT,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+INSERT INTO system_config (key, value, description) VALUES
+  ('content_aggregation', '{"enabled": true, "interval_hours": 6, "max_articles_per_run": 20}', 'Content aggregation settings'),
+  ('ai_processing', '{"enabled": true, "model": "claude-3-5-sonnet-20241022", "min_word_count": 300}', 'AI processing settings'),
+  ('publishing', '{"enabled": true, "auto_publish": false, "require_review": true}', 'Smart publisher settings'),
+  ('social_media', '{"enabled": true, "platforms": ["linkedin", "twitter"]}', 'Social media settings'),
+  ('newsletter', '{"enabled": true, "send_day": "friday", "send_hour": 10}', 'Newsletter settings')
+ON CONFLICT (key) DO NOTHING;
+
+-- Content hash for duplicate detection
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS content_hash TEXT;
+CREATE INDEX IF NOT EXISTS idx_articles_content_hash ON articles(content_hash);
+
+-- RLS for new tables
+ALTER TABLE rss_sources ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workflow_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE publishing_schedule ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_config ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role full access to rss_sources"
+  ON rss_sources FOR ALL USING (auth.role() = 'service_role');
+
+CREATE POLICY "Service role full access to workflow_runs"
+  ON workflow_runs FOR ALL USING (auth.role() = 'service_role');
+
+CREATE POLICY "Service role full access to publishing_schedule"
+  ON publishing_schedule FOR ALL USING (auth.role() = 'service_role');
+
+CREATE POLICY "Service role full access to system_config"
+  ON system_config FOR ALL USING (auth.role() = 'service_role');
+
+-- Automation health view
+CREATE OR REPLACE VIEW automation_health AS
+SELECT
+  (SELECT COUNT(*) FROM articles_queue WHERE status = 'pending_ai_processing') as pending_articles,
+  (SELECT COUNT(*) FROM articles WHERE status = 'draft') as draft_articles,
+  (SELECT COUNT(*) FROM articles WHERE status = 'published' AND published_at > NOW() - INTERVAL '24 hours') as published_today,
+  (SELECT COUNT(*) FROM error_logs WHERE occurred_at > NOW() - INTERVAL '24 hours' AND resolved = FALSE) as unresolved_errors,
+  (SELECT COUNT(*) FROM rss_sources WHERE is_active = TRUE) as active_sources,
+  (SELECT COUNT(*) FROM newsletter_subscribers WHERE active = TRUE) as active_subscribers;

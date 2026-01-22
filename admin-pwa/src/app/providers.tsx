@@ -24,7 +24,7 @@ export function Providers({ children }: ProvidersProps) {
   )
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
         <PWAInitializer />
         <AuthHydrator />

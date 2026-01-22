@@ -4,10 +4,15 @@
 
 :root {
   color-scheme: light;
+  --accent-color: #3b82f6;
 }
 
 :root.dark {
   color-scheme: dark;
+}
+
+:root.oled body {
+  background: #000000;
 }
 
 * {

@@ -5,16 +5,26 @@ import { Sparkles, RefreshCcw } from 'lucide-react'
 
 import { CardStack } from '@/components/review/CardStack'
 import { useArticlesStore } from '@/stores/articles'
+import { usePullToRefresh } from '@/lib/gestures/usePullToRefresh'
 
 export default function ReviewPage() {
   const { queue, loading, fetchQueue, handleAction } = useArticlesStore()
+  const { containerRef, pullDistance, isRefreshing } = usePullToRefresh(fetchQueue, {
+    disabled: loading,
+  })
 
   useEffect(() => {
     fetchQueue()
   }, [fetchQueue])
 
   return (
-    <div className="space-y-4">
+    <div ref={containerRef} className="space-y-4">
+      <div
+        className="flex items-center justify-center text-xs text-gray-500 dark:text-gray-400"
+        style={{ height: pullDistance }}
+      >
+        {isRefreshing ? 'Refreshing queue...' : pullDistance > 10 ? 'Release to refresh' : ''}
+      </div>
       <header className="flex items-start justify-between">
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-500">Review Queue</p>

@@ -1,0 +1,116 @@
+═══════════════════════════════════════════════════════════════════
+  🚀 HSE NEWS AUTOMATION - QUICK START GUIDE
+═══════════════════════════════════════════════════════════════════
+
+✅ WHAT YOU HAVE:
+- ✓ Website running at http://localhost:3003
+- ✓ Database configured (Supabase)
+- ✓ 7 n8n workflow files ready to import
+- ✓ Complete automation system designed
+
+═══════════════════════════════════════════════════════════════════
+📋 STEP 1: IMPORT WORKFLOWS TO N8N
+═══════════════════════════════════════════════════════════════════
+
+1. Go to: https://n8n.srv1246730.hstgr.cloud
+2. Login with your credentials
+3. For each workflow file in n8n-workflows/:
+   - Click Workflows → + (New)
+   - Click ⋮ menu → Import from File
+   - Select JSON file
+   - Click Import
+
+Files to import:
+- 1-content-aggregation-engine.json
+- 2-ai-processing-pipeline.json
+- 3-smart-publisher.json
+- 4-social-media-distributor.json
+- 5-newsletter-compiler.json
+- 6-analytics-monitor.json
+- 7-error-handler.json
+
+═══════════════════════════════════════════════════════════════════
+🔑 STEP 2: CONFIGURE CREDENTIALS
+═══════════════════════════════════════════════════════════════════
+
+YOU ALREADY HAVE:
+✓ Supabase URL: https://hsownlzxiqhnstvaftqm.supabase.co
+✓ Supabase Key: sb_publishable_oe3mKyjPKWvk1IaywLQtgQ_ZX6FOQZm
+✓ Service Key: sb_secret_dL6B4m5AVmp_JNf-fI_tpg_Irv-iVsC
+
+YOU NEED:
+❌ Anthropic API Key (for Claude AI)
+   → Get from: https://console.anthropic.com/settings/keys
+
+❌ Social Media Credentials (optional)
+   → LinkedIn: https://www.linkedin.com/developers/
+   → Twitter: https://developer.twitter.com/
+   → Facebook: https://developers.facebook.com/
+
+❌ Email SMTP (for newsletters)
+   → Gmail: Use app-specific password
+
+═══════════════════════════════════════════════════════════════════
+✅ STEP 3: TEST & ACTIVATE
+═══════════════════════════════════════════════════════════════════
+
+Test Order:
+1. Content Aggregation → Execute manually → Check articles_queue
+2. AI Processing → Trigger with webhook → Check articles table
+3. Smart Publisher → Update scheduled_publish_time → Verify published
+4. Activate all 7 workflows (toggle to green)
+
+═══════════════════════════════════════════════════════════════════
+📊 EXPECTED RESULTS (ONCE ACTIVE)
+═══════════════════════════════════════════════════════════════════
+
+DAILY:
+- 20-40 articles scraped
+- 15-25 articles AI-processed
+- 3-5 articles published
+- 9-15 social media posts
+- 1 analytics email (9 AM)
+
+WEEKLY:
+- 1 newsletter (Sunday 8 AM)
+
+═══════════════════════════════════════════════════════════════════
+🎯 CURRENT STATUS
+═══════════════════════════════════════════════════════════════════
+
+✅ COMPLETED:
+- Website deployed locally
+- Database schema applied
+- 3 sample articles loaded
+- Environment variables configured
+- Workflow files ready
+
+⏳ TODO:
+- Import workflows to n8n
+- Get Anthropic API key
+- Configure credentials
+- Test workflows
+- Activate automation
+
+═══════════════════════════════════════════════════════════════════
+📚 DOCUMENTATION
+═══════════════════════════════════════════════════════════════════
+
+Detailed Guide: N8N_SETUP_GUIDE.md
+Workflow Details: n8n-workflows/README.md
+Website URL: http://localhost:3003
+n8n URL: https://n8n.srv1246730.hstgr.cloud
+Supabase: https://supabase.com/dashboard/project/hsownlzxiqhnstvaftqm
+
+═══════════════════════════════════════════════════════════════════
+🚀 NEXT IMMEDIATE STEP
+═══════════════════════════════════════════════════════════════════
+
+1. Get Anthropic API key: https://console.anthropic.com/settings/keys
+2. Open: https://n8n.srv1246730.hstgr.cloud
+3. Import first workflow: 1-content-aggregation-engine.json
+4. Follow N8N_SETUP_GUIDE.md for complete instructions
+
+═══════════════════════════════════════════════════════════════════
+
+Good luck! Your HSE News automation is almost ready! 🎉
