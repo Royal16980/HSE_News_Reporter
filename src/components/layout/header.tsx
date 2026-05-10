@@ -3,148 +3,137 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, Search, X } from 'lucide-react'
+import { Menu, Search, X, Zap } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ThemeToggle } from '@/components/theme-toggle'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { CATEGORIES } from '@/lib/constants'
 
-/**
- * Main header component with responsive navigation
- * Features: sticky header, mobile menu, search bar, theme toggle
- */
+const NAV_ITEMS = [
+  { name: 'Latest', href: '/news' },
+  { name: 'Prosecutions', href: '/prosecutions' },
+  { name: 'Regulations', href: '/regulations' },
+  { name: 'Investigations', href: '/investigations' },
+  { name: 'About', href: '/about' },
+]
+
 export function Header() {
   const pathname = usePathname()
   const [isMenuOpen, setIsMenuOpen] = React.useState(false)
   const [isSearchOpen, setIsSearchOpen] = React.useState(false)
   const [isScrolled, setIsScrolled] = React.useState(false)
 
-  // Handle scroll effect for header background
   React.useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10)
-    }
-    window.addEventListener('scroll', handleScroll)
+    const handleScroll = () => setIsScrolled(window.scrollY > 10)
+    window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Close mobile menu on route change
   React.useEffect(() => {
     setIsMenuOpen(false)
+    setIsSearchOpen(false)
   }, [pathname])
-
-  const navigation = [
-    { name: 'Home', href: '/' },
-    { name: 'Latest News', href: '/news' },
-    { name: 'Categories', href: '/categories' },
-    { name: 'About', href: '/about' },
-  ]
 
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 w-full border-b transition-all duration-300',
+        'sticky top-0 z-50 w-full border-b border-rule transition-all duration-200',
         isScrolled
-          ? 'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm'
-          : 'bg-background'
+          ? 'bg-charcoal/95 backdrop-blur-sm'
+          : 'bg-charcoal'
       )}
     >
+      {/* Primary nav bar */}
       <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link
-            href="/"
-            className="flex items-center space-x-2 group"
-            aria-label="Home"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-brand shadow-lg group-hover:shadow-xl transition-shadow">
-              <span className="text-xl font-bold text-white">HS</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-lg font-bold leading-none gradient-text hidden sm:block">
-                UK Health & Safety
-              </span>
-              <span className="text-xs text-muted-foreground hidden sm:block">
-                Intelligence Platform
-              </span>
-            </div>
+        <div className="flex h-14 items-center justify-between gap-4">
+
+          {/* Wordmark */}
+          <Link href="/" className="flex-shrink-0" aria-label="SafetyNews Pro — Home">
+            <span className="font-serif text-xl font-semibold tracking-tight">
+              <span className="text-amber">Safety</span>
+              <span className="text-paper">News</span>
+            </span>
+            <span className="ml-1.5 font-mono text-[10px] font-medium tracking-[0.2em] uppercase text-amber/60 align-super">
+              Pro
+            </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-6">
-            {navigation.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'text-sm font-medium transition-colors hover:text-primary relative group',
-                  pathname === item.href
-                    ? 'text-primary'
-                    : 'text-muted-foreground'
-                )}
-              >
-                {item.name}
-                <span
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-1" aria-label="Primary">
+            {NAV_ITEMS.map((item) => {
+              const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
                   className={cn(
-                    'absolute -bottom-1 left-0 h-0.5 bg-gradient-brand transition-all',
-                    pathname === item.href ? 'w-full' : 'w-0 group-hover:w-full'
+                    'relative px-3 py-1 text-[13px] font-medium tracking-wide transition-colors',
+                    active
+                      ? 'text-amber'
+                      : 'text-paper-dim hover:text-paper'
                   )}
-                />
-              </Link>
-            ))}
+                >
+                  {item.name}
+                  {active && (
+                    <span className="absolute inset-x-3 -bottom-[1px] h-px bg-amber" />
+                  )}
+                </Link>
+              )
+            })}
           </nav>
 
           {/* Actions */}
-          <div className="flex items-center space-x-2">
-            {/* Search Button */}
-            <Button
-              variant="ghost"
-              size="icon"
+          <div className="flex items-center gap-1 ml-auto md:ml-0">
+            {/* Ask AI — Phase 5 stub */}
+            <button
+              type="button"
+              disabled
+              title="Ask AI — available in Phase 5"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1 text-[11px] font-mono uppercase tracking-widest border border-amber/20 text-amber/40 cursor-not-allowed"
+            >
+              <Zap className="h-3 w-3" />
+              Ask AI
+            </button>
+
+            {/* Search */}
+            <button
+              type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              aria-label="Search"
+              aria-label={isSearchOpen ? 'Close search' : 'Open search'}
+              className="p-2 text-paper-dim hover:text-paper transition-colors"
             >
-              <Search className="h-5 w-5" />
-            </Button>
+              {isSearchOpen ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+            </button>
 
-            {/* Theme Toggle */}
-            <ThemeToggle />
-
-            {/* Mobile Menu Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
+            {/* Mobile menu toggle */}
+            <button
+              type="button"
+              className="md:hidden p-2 text-paper-dim hover:text-paper transition-colors"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              aria-label="Toggle menu"
+              aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={isMenuOpen}
             >
-              {isMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
-            </Button>
+              {isMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
           </div>
         </div>
 
-        {/* Search Bar */}
+        {/* Search bar */}
         <AnimatePresence>
           {isSearchOpen && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden border-t"
+              transition={{ duration: 0.15 }}
+              className="overflow-hidden border-t border-rule"
             >
-              <div className="py-4">
-                <form onSubmit={(e) => e.preventDefault()}>
-                  <Input
+              <div className="py-3">
+                <form onSubmit={(e) => e.preventDefault()} role="search">
+                  <input
                     type="search"
-                    placeholder="Search health & safety news..."
-                    className="w-full"
+                    placeholder="Search prosecutions, regulations, incidents..."
                     autoFocus
+                    className="w-full bg-charcoal-50 border border-rule px-4 py-2 text-sm text-paper placeholder:text-paper-dim focus:outline-none focus:border-amber/40 font-mono"
                   />
                 </form>
               </div>
@@ -152,56 +141,66 @@ export function Header() {
           )}
         </AnimatePresence>
 
-        {/* Mobile Menu */}
+        {/* Mobile nav */}
         <AnimatePresence>
           {isMenuOpen && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="md:hidden overflow-hidden border-t"
+              transition={{ duration: 0.2 }}
+              className="md:hidden overflow-hidden border-t border-rule"
             >
-              <nav className="py-4 space-y-2">
-                {navigation.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      'block px-4 py-2 text-sm font-medium rounded-md transition-colors',
-                      pathname === item.href
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                    )}
-                  >
-                    {item.name}
-                  </Link>
-                ))}
+              <nav className="py-2 space-y-0.5" aria-label="Mobile primary">
+                {NAV_ITEMS.map((item) => {
+                  const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        'block px-4 py-2.5 text-sm font-medium border-l-2 transition-colors',
+                        active
+                          ? 'border-amber text-amber bg-amber/5'
+                          : 'border-transparent text-paper-dim hover:text-paper hover:bg-charcoal-50'
+                      )}
+                    >
+                      {item.name}
+                    </Link>
+                  )
+                })}
               </nav>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Category Navigation Bar */}
-      <div className="border-t bg-muted/30">
+      {/* Sector lens bar */}
+      <div className="border-t border-rule bg-charcoal-50/40">
         <div className="container mx-auto px-4">
-          <div className="flex overflow-x-auto scrollbar-hide py-3 space-x-4 snap-x snap-mandatory">
-            {CATEGORIES.slice(0, 8).map((category) => (
-              <Link
-                key={category.slug}
-                href={`/category/${category.slug}`}
-                className={cn(
-                  'flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all snap-start',
-                  'hover:bg-accent hover:shadow-sm',
-                  pathname === `/category/${category.slug}`
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-background text-muted-foreground'
-                )}
-              >
-                <span>{category.name}</span>
-              </Link>
-            ))}
+          <div
+            className="flex overflow-x-auto"
+            style={{ scrollbarWidth: 'none' }}
+            role="navigation"
+            aria-label="Sector lenses"
+          >
+            {CATEGORIES.map((sector) => {
+              const active = pathname === `/sector/${sector.slug}`
+              return (
+                <Link
+                  key={sector.slug}
+                  href={`/sector/${sector.slug}`}
+                  className={cn(
+                    'flex-shrink-0 px-4 py-2 text-[11px] font-mono uppercase tracking-widest whitespace-nowrap border-b-2 transition-colors',
+                    active
+                      ? 'border-amber text-amber'
+                      : 'border-transparent text-paper-dim hover:text-paper hover:border-paper-dim/30'
+                  )}
+                >
+                  {sector.name}
+                </Link>
+              )
+            })}
           </div>
         </div>
       </div>

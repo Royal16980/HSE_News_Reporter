@@ -1,23 +1,16 @@
 import { Suspense } from 'react'
 import { HeroSection } from '@/components/home/hero-section'
+import { SolariTicker } from '@/components/home/SolariTicker'
 import { NewsletterSection } from '@/components/home/newsletter-section'
 import { TrendingTopics } from '@/components/home/trending-topics'
 import { ArticleCard } from '@/components/article/article-card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { supabase } from '@/lib/supabase'
-import { calculateReadingTime } from '@/lib/utils'
 import type { Article } from '@/types/database'
 import type { ArticleCardProps } from '@/types'
 
-/**
- * Homepage with ISR (Incremental Static Regeneration)
- * Revalidates every 60 seconds to ensure fresh content
- */
-export const revalidate = 60 // ISR: Revalidate every 60 seconds
+export const revalidate = 60
 
-/**
- * Fetch featured articles from Supabase
- */
 async function getFeaturedArticles(): Promise<ArticleCardProps[]> {
   try {
     const { data, error } = await supabase
@@ -45,15 +38,11 @@ async function getFeaturedArticles(): Promise<ArticleCardProps[]> {
         isFeatured: true,
       })) || []
     )
-  } catch (error) {
-    console.error('Error fetching featured articles:', error)
+  } catch {
     return []
   }
 }
 
-/**
- * Fetch latest articles from Supabase
- */
 async function getLatestArticles(): Promise<ArticleCardProps[]> {
   try {
     const { data, error } = await supabase
@@ -61,7 +50,7 @@ async function getLatestArticles(): Promise<ArticleCardProps[]> {
       .select('*')
       .eq('status', 'published')
       .order('published_at', { ascending: false })
-      .range(3, 14) // Skip first 3 (featured), get next 12
+      .range(3, 14)
 
     if (error) throw error
 
@@ -80,46 +69,39 @@ async function getLatestArticles(): Promise<ArticleCardProps[]> {
         viewsCount: article.views_count,
       })) || []
     )
-  } catch (error) {
-    console.error('Error fetching latest articles:', error)
+  } catch {
     return []
   }
 }
 
-/**
- * Article Grid Loading Skeleton
- */
 function ArticleGridSkeleton() {
   return (
-    <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       {[...Array(6)].map((_, i) => (
-        <div key={i} className="space-y-4">
-          <Skeleton className="aspect-video w-full" />
-          <Skeleton className="h-6 w-3/4" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-2/3" />
+        <div key={i} className="space-y-3 border border-rule p-4">
+          <Skeleton className="aspect-video w-full bg-charcoal-50" />
+          <Skeleton className="h-5 w-3/4 bg-charcoal-50" />
+          <Skeleton className="h-4 w-full bg-charcoal-50" />
+          <Skeleton className="h-4 w-2/3 bg-charcoal-50" />
         </div>
       ))}
     </div>
   )
 }
 
-/**
- * Featured Articles Section
- */
 async function FeaturedArticles() {
   const articles = await getFeaturedArticles()
 
   if (articles.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">No featured articles available.</p>
-      </div>
+      <p className="py-8 font-mono text-sm text-paper-dim">
+        No articles yet — NOVA-PRIME is gathering intelligence.
+      </p>
     )
   }
 
   return (
-    <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       {articles.map((article) => (
         <ArticleCard key={article.id} {...article} />
       ))}
@@ -127,18 +109,12 @@ async function FeaturedArticles() {
   )
 }
 
-/**
- * Latest Articles Section
- */
 async function LatestArticles() {
   const articles = await getLatestArticles()
-
-  if (articles.length === 0) {
-    return null
-  }
+  if (articles.length === 0) return null
 
   return (
-    <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       {articles.map((article) => (
         <ArticleCard key={article.id} {...article} />
       ))}
@@ -146,55 +122,54 @@ async function LatestArticles() {
   )
 }
 
-/**
- * Homepage Component
- */
+function SectionHeading({ label, title }: { label: string; title: string }) {
+  return (
+    <div className="mb-8 border-b border-rule pb-4">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-amber mb-1">{label}</p>
+      <h2 className="font-serif text-subhead font-semibold text-paper">{title}</h2>
+    </div>
+  )
+}
+
 export default function HomePage() {
   return (
-    <div className="flex flex-col">
-      {/* Hero Section */}
+    <div className="flex flex-col bg-charcoal">
       <HeroSection />
 
-      {/* Featured Stories */}
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-          <div className="mb-12">
-            <h2 className="text-3xl font-bold tracking-tight md:text-4xl mb-3">
-              Featured Stories
-            </h2>
-            <p className="text-lg text-muted-foreground">
-              Today's most important health & safety updates
-            </p>
-          </div>
+      {/* Prosecution ticker — Solari split-flap */}
+      <section className="border-b border-rule">
+        <div className="container mx-auto px-4 py-6">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-amber mb-4">
+            Recent prosecutions — live
+          </p>
+          <SolariTicker />
+        </div>
+      </section>
 
+      {/* Featured Stories */}
+      <section className="py-12">
+        <div className="container mx-auto px-4">
+          <SectionHeading label="Top stories" title="Featured coverage" />
           <Suspense fallback={<ArticleGridSkeleton />}>
             <FeaturedArticles />
           </Suspense>
         </div>
       </section>
 
-      {/* Trending Topics */}
+      {/* Trending */}
       <TrendingTopics />
 
       {/* Latest Updates */}
-      <section className="py-16">
+      <section className="py-12">
         <div className="container mx-auto px-4">
-          <div className="mb-12">
-            <h2 className="text-3xl font-bold tracking-tight md:text-4xl mb-3">
-              Latest Updates
-            </h2>
-            <p className="text-lg text-muted-foreground">
-              Recent news and insights from across the UK
-            </p>
-          </div>
-
+          <SectionHeading label="Latest" title="Recent updates" />
           <Suspense fallback={<ArticleGridSkeleton />}>
             <LatestArticles />
           </Suspense>
         </div>
       </section>
 
-      {/* Newsletter CTA */}
+      {/* Newsletter */}
       <NewsletterSection />
     </div>
   )

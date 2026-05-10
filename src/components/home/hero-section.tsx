@@ -1,178 +1,107 @@
 'use client'
 
 import * as React from 'react'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Search, TrendingUp, Shield, CheckCircle2 } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { TRUST_INDICATORS } from '@/lib/constants'
+import { ArrowRight, TrendingUp, Scale, AlertTriangle } from 'lucide-react'
 
-/**
- * Hero section with animated gradient background and search
- * Features: floating particles, gradient animation, trust indicators
- */
+// Phase 1 seed stats — replaced by Supabase data in Phase 2
+const SEED_STATS = [
+  { label: 'Prosecutions YTD', value: '847', icon: Scale, href: '/prosecutions' },
+  { label: 'Total fines levied', value: '£38.4M', icon: TrendingUp, href: '/prosecutions' },
+  { label: 'Active investigations', value: '12', icon: AlertTriangle, href: '/investigations' },
+  { label: 'Sectors tracked', value: '8', icon: null, href: '/sectors' },
+]
+
 export function HeroSection() {
-  const [searchQuery, setSearchQuery] = React.useState('')
-  const [windowSize, setWindowSize] = React.useState({ width: 1200, height: 800 })
-
-  React.useEffect(() => {
-    // Set window size only on client side
-    if (typeof window !== 'undefined') {
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight })
-    }
-  }, [])
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (searchQuery.trim()) {
-      window.location.href = `/search?q=${encodeURIComponent(searchQuery)}`
-    }
-  }
-
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-blue-950 dark:to-purple-950">
-      {/* Animated Background Gradient */}
-      <div className="absolute inset-0 animated-gradient opacity-20" />
+    <section className="bg-charcoal border-b border-rule">
+      {/* Amber masthead rule */}
+      <div className="h-px w-full bg-amber" />
 
-      {/* Floating Particles */}
-      <div className="absolute inset-0">
-        {[...Array(20)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute h-2 w-2 rounded-full bg-primary/30"
-            initial={{
-              x: Math.random() * windowSize.width,
-              y: Math.random() * windowSize.height,
-            }}
-            animate={{
-              y: [0, -100, 0],
-              opacity: [0.2, 0.5, 0.2],
-            }}
-            transition={{
-              duration: 5 + Math.random() * 5,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-            }}
-          />
-        ))}
-      </div>
+      <div className="container mx-auto px-4 py-12 md:py-16">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-10 items-start">
 
-      {/* Content */}
-      <div className="container relative mx-auto px-4 py-24 md:py-32">
-        <div className="mx-auto max-w-4xl text-center">
-          {/* Badge */}
+          {/* Editorial lede — left column */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="mb-8 inline-flex items-center space-x-2 rounded-full bg-white/90 dark:bg-gray-800/90 px-4 py-2 shadow-lg backdrop-blur"
+            transition={{ duration: 0.4 }}
+            className="space-y-5"
           >
-            <TrendingUp className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">
-              The UK's Most Trusted H&S News Platform
-            </span>
+            {/* Kicker */}
+            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-amber">
+              Autonomous UK H&amp;S Intelligence
+            </p>
+
+            {/* Editorial headline — NOT centred, no gradient */}
+            <h1 className="font-serif text-headline font-semibold text-paper leading-[1.08] max-w-[22ch]">
+              Every fine. Every prosecution. Every life-changing breach —
+              <em className="not-italic text-amber"> reported the moment it happens.</em>
+            </h1>
+
+            {/* Lede */}
+            <p className="text-body text-paper-dim leading-relaxed max-w-[55ch]">
+              NOVA-PRIME monitors HSE enforcement actions, tribunal decisions, and
+              regulatory changes across all eight UK industry sectors, 24 hours a day.
+              No press releases. No PRs. Just the record.
+            </p>
+
+            {/* CTA — text link, not a button pill */}
+            <div className="flex items-center gap-6 pt-1">
+              <Link
+                href="/prosecutions"
+                className="inline-flex items-center gap-2 text-sm font-medium text-amber hover:text-amber-dim transition-colors group"
+              >
+                Browse all prosecutions
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Link>
+              <Link
+                href="/about"
+                className="text-sm text-paper-dim hover:text-paper transition-colors"
+              >
+                How this works
+              </Link>
+            </div>
           </motion.div>
 
-          {/* Headline */}
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="mb-6 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl"
-          >
-            The UK's Premier{' '}
-            <span className="gradient-text">Health & Safety</span>
-            <br />
-            Intelligence Platform
-          </motion.h1>
-
-          {/* Subheading */}
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="mb-12 text-lg text-muted-foreground md:text-xl"
-          >
-            Stay ahead with real-time updates, expert analysis, and
-            comprehensive coverage of UK health and safety news and regulations.
-          </motion.p>
-
-          {/* Search Bar */}
+          {/* Stats block — right column */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="mb-12"
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.15 }}
+            className="border border-rule bg-charcoal-50 divide-y divide-rule"
           >
-            <form
-              onSubmit={handleSearch}
-              className="mx-auto flex max-w-2xl items-center space-x-2 rounded-full bg-white dark:bg-gray-800 p-2 shadow-2xl ring-1 ring-gray-200 dark:ring-gray-700"
-            >
-              <Search className="ml-4 h-5 w-5 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search health & safety news, regulations, best practices..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-              />
-              <Button
-                type="submit"
-                variant="gradient"
-                className="rounded-full px-8"
+            <div className="px-4 py-3 border-b border-rule">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-paper-dim">
+                Live enforcement data
+              </p>
+            </div>
+            {SEED_STATS.map((stat) => (
+              <Link
+                key={stat.label}
+                href={stat.href}
+                className="flex items-center justify-between px-4 py-3 hover:bg-amber/5 transition-colors group"
               >
-                Search
-              </Button>
-            </form>
-          </motion.div>
-
-          {/* Trust Indicators */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="flex flex-wrap items-center justify-center gap-6 text-sm"
-          >
-            {[
-              {
-                icon: Shield,
-                text: `${TRUST_INDICATORS.SUBSCRIBERS} Safety Professionals`,
-              },
-              {
-                icon: CheckCircle2,
-                text: TRUST_INDICATORS.UPDATE_FREQUENCY,
-              },
-              {
-                icon: CheckCircle2,
-                text: TRUST_INDICATORS.VERIFICATION,
-              },
-            ].map((indicator, index) => (
-              <div
-                key={index}
-                className="flex items-center space-x-2 rounded-full bg-white/80 dark:bg-gray-800/80 px-4 py-2 backdrop-blur"
-              >
-                <indicator.icon className="h-4 w-4 text-primary" />
-                <span className="font-medium">{indicator.text}</span>
-              </div>
+                <span className="text-[12px] font-mono text-paper-dim group-hover:text-paper transition-colors">
+                  {stat.label}
+                </span>
+                <span className="font-mono text-[15px] font-medium text-amber tabular-nums">
+                  {stat.value}
+                </span>
+              </Link>
             ))}
+            <div className="px-4 py-2">
+              <p className="font-mono text-[10px] text-paper-dim/50">
+                Updated every 15 min by NOVA-PRIME
+              </p>
+            </div>
           </motion.div>
         </div>
       </div>
 
-      {/* Bottom Wave */}
-      <div className="absolute bottom-0 left-0 right-0">
-        <svg
-          viewBox="0 0 1440 120"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-full"
-        >
-          <path
-            d="M0 0L60 10C120 20 240 40 360 46.7C480 53 600 47 720 43.3C840 40 960 40 1080 46.7C1200 53 1320 67 1380 73.3L1440 80V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0V0Z"
-            className="fill-background"
-          />
-        </svg>
-      </div>
+      {/* Bottom amber hairline */}
+      <div className="h-px w-full bg-rule" />
     </section>
   )
 }

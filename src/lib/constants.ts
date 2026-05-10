@@ -1,73 +1,70 @@
-/**
- * Application-wide constants and configuration
- */
-
 export const SITE_CONFIG = {
-  name: 'UK Health & Safety News',
-  description: "The UK's Premier Health & Safety Intelligence Platform",
-  url: process.env.NEXT_PUBLIC_SITE_URL || 'https://hsenews.uk',
+  name: 'SafetyNews Pro',
+  description: 'Autonomous UK Health & Safety Intelligence — prosecutions, regulations, incidents',
+  url: process.env.NEXT_PUBLIC_SITE_URL || 'https://safetynews.pro',
   ogImage: '/og-image.jpg',
   links: {
-    twitter: 'https://twitter.com/hsenewsuk',
-    linkedin: 'https://linkedin.com/company/hsenewsuk',
+    twitter: 'https://twitter.com/safetynewspro',
+    linkedin: 'https://linkedin.com/company/safetynewspro',
   },
 }
 
 export const CATEGORIES = [
   {
-    name: 'Workplace Safety',
-    slug: 'workplace-safety',
-    icon: 'HardHat',
-    description: 'General workplace safety news and updates',
-  },
-  {
-    name: 'Fire Safety',
-    slug: 'fire-safety',
-    icon: 'Flame',
-    description: 'Fire prevention and safety regulations',
-  },
-  {
-    name: 'Chemical Safety',
-    slug: 'chemical-safety',
-    icon: 'FlaskConical',
-    description: 'Chemical handling and COSHH compliance',
-  },
-  {
     name: 'Construction',
     slug: 'construction',
-    icon: 'Construction',
-    description: 'Construction site safety and CDM regulations',
+    icon: 'HardHat',
+    description: 'Construction industry H&S — CDM, scaffolding, falls',
+  },
+  {
+    name: 'Manufacturing',
+    slug: 'manufacturing',
+    icon: 'Factory',
+    description: 'Manufacturing sector H&S — machinery, PUWER, LOLER',
   },
   {
     name: 'Healthcare',
     slug: 'healthcare',
     icon: 'Heart',
-    description: 'Healthcare and medical facility safety',
+    description: 'NHS & private healthcare H&S — infection control, moving & handling',
   },
   {
-    name: 'Food Safety',
-    slug: 'food-safety',
+    name: 'Agriculture',
+    slug: 'agriculture',
+    icon: 'Wheat',
+    description: 'Farming & agricultural H&S — tractors, pesticides, livestock',
+  },
+  {
+    name: 'Education',
+    slug: 'education',
+    icon: 'GraduationCap',
+    description: 'Schools & universities H&S — CLEAPSS, educational visits',
+  },
+  {
+    name: 'Hospitality',
+    slug: 'hospitality',
     icon: 'UtensilsCrossed',
-    description: 'Food hygiene and safety standards',
+    description: 'Hotels, restaurants & leisure H&S — food safety, manual handling',
   },
   {
-    name: 'Ergonomics',
-    slug: 'ergonomics',
-    icon: 'Armchair',
-    description: 'Workplace ergonomics and DSE',
+    name: 'Transport',
+    slug: 'transport',
+    icon: 'Truck',
+    description: 'Road, rail & logistics H&S — driver hours, vehicle safety',
   },
   {
-    name: 'Mental Health',
-    slug: 'mental-health',
-    icon: 'Brain',
-    description: 'Workplace mental health and wellbeing',
+    name: 'Retail',
+    slug: 'retail',
+    icon: 'ShoppingCart',
+    description: 'Retail & warehousing H&S — forklift, fire safety, lone working',
   },
 ]
 
 export const ARTICLE_TYPES = {
+  PROSECUTIONS: 'prosecutions',
   INCIDENTS: 'incidents',
   REGULATIONS: 'regulations',
-  BEST_PRACTICES: 'best-practices',
+  INVESTIGATIONS: 'investigations',
   NEWS: 'news',
   GUIDES: 'guides',
 }
@@ -80,34 +77,33 @@ export const PAGINATION = {
 }
 
 export const CACHE_REVALIDATION = {
-  HOMEPAGE: 60, // 1 minute
-  ARTICLE: 300, // 5 minutes
-  CATEGORIES: 3600, // 1 hour
-  TRENDING: 600, // 10 minutes
+  HOMEPAGE: 60,
+  ARTICLE: 300,
+  CATEGORIES: 3600,
+  TRENDING: 600,
 }
 
 export const SEO = {
-  DEFAULT_TITLE: "UK Health & Safety News | The UK's Premier H&S Intelligence Platform",
+  DEFAULT_TITLE: 'SafetyNews Pro — Autonomous UK Health & Safety Intelligence',
   DEFAULT_DESCRIPTION:
-    'Stay updated with the latest UK health and safety news, regulations, incidents, and best practices. Expert analysis for safety professionals.',
+    'UK HSE prosecutions, regulations, incidents and investigations. Produced by NOVA-PRIME · Governance Swarm verified.',
   DEFAULT_KEYWORDS: [
     'health and safety',
-    'UK HSE',
-    'workplace safety',
-    'safety regulations',
-    'health and safety news',
-    'HSE updates',
-    'safety compliance',
+    'UK HSE prosecutions',
+    'workplace safety news',
+    'HSE enforcement',
+    'RIDDOR incidents',
+    'safety regulations UK',
+    'occupational health',
   ],
 }
 
 export const SOCIAL_SHARE = {
-  TWITTER_HANDLE: '@hsenewsuk',
-  HASHTAGS: ['HealthAndSafety', 'SafetyFirst', 'UKHSE'],
+  TWITTER_HANDLE: '@safetynewspro',
+  HASHTAGS: ['HealthAndSafety', 'HSEProsecution', 'WorkplaceSafety'],
 }
 
-export const TRUST_INDICATORS = {
-  SUBSCRIBERS: '10,000+',
-  UPDATE_FREQUENCY: 'Updated Daily',
-  VERIFICATION: 'HSE Verified',
+export const BYLINE = {
+  DEFAULT: 'NOVA-PRIME desk · Reviewed by Governance Swarm',
+  INVESTIGATION: 'Research Swarm · Editorial Swarm · Governance Swarm verified',
 }
