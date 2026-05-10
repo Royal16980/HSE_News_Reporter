@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/nova-prime",
+      "schedule": "*/15 * * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/cron/nova-prime/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/ask/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

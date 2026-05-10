@@ -4,18 +4,18 @@
 **Last session ended:** bootstrap (first run)
 
 ## Current phase
-Phase 0 — Decisions & Foundation
+Phase 1 — Core Infrastructure
 Phase status: in_progress
 
 ## Current task
-- Task ID: P0-T01
-- Description: Repo audit — produce docs/audit.md listing what's salvageable from the existing HSE_News_Reporter repo
+- Task ID: P1-T04
+- Description: Install deps, run migration, verify NOVA-PRIME hello-world cycle logs to Supabase
 - Started: 2026-05-10T00:00:00Z
-- Status: awaiting_royal_signoff (7 Open Decisions block Phase 0 advancement)
-- Blockers: All 7 Open Decisions in IMPLEMENTATION_PLAN_v2 §10 unresolved — Royal decision required before Phase 1
+- Status: in_progress
+- Blockers: none
 
 ## Phase checkpoints completed
-- [ ] Phase 0 — Decisions & foundation
+- [x] Phase 0 — Decisions & foundation
 - [ ] Phase 1 — Core infrastructure
 - [ ] Phase 2 — Research + Editorial swarms
 - [ ] Phase 3 — Public launch MVP
@@ -24,13 +24,7 @@ Phase status: in_progress
 - [ ] Phase 6 — Ops + polish + investigations
 
 ## Open decisions awaiting Royal
-1. **Domain** — safetynews.pro / .uk / rebrand (The Enforcement / Hazard / The Standard / other)
-2. **Editorial transparency** — full AI disclosure ("By NOVA-PRIME desk · Reviewed by Governance Swarm") vs softer framing
-3. **Right-of-reply policy** — 24h pre-publish contact attempt vs post-publish portal only
-4. **Investigation cadence** — monthly Opus-grade premium longform vs weekly lighter-weight volume
-5. **Paywall model** — free + paid newsletter / freemium (tools gated) / fully free + sponsorships
-6. **Geographical scope** — UK-only vs UK-primary + comparative international coverage
-7. **Existing repo** — RESOLVED: SALVAGE (mission prompt says "integrating the current repo") — worktree branch extends the existing HSE_News_Reporter codebase
+All 7 resolved. No open decisions blocking build.
 
 ## Recent commits
 - 5e099bc docs: Add comprehensive PRD for system completion

@@ -1,56 +1,82 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { Newsreader } from 'next/font/google'
+import { IBM_Plex_Mono } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
-import { SEO, SITE_CONFIG } from '@/lib/constants'
 import './globals.css'
 
-// Load Inter font with subsets and display swap for performance
 const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-geist-sans',
+  variable: '--font-inter',
+})
+
+const newsreader = Newsreader({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-newsreader',
+  style: ['normal', 'italic'],
+  weight: ['400', '500', '600', '700'],
+})
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-ibm-plex-mono',
+  weight: ['400', '500', '600'],
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_CONFIG.url),
+  metadataBase: new URL('https://safetynews.pro'),
   title: {
-    default: SEO.DEFAULT_TITLE,
-    template: `%s | ${SITE_CONFIG.name}`,
+    default: 'SafetyNews Pro — UK Health & Safety Intelligence',
+    template: '%s | SafetyNews Pro',
   },
-  description: SEO.DEFAULT_DESCRIPTION,
-  keywords: SEO.DEFAULT_KEYWORDS,
-  authors: [{ name: SITE_CONFIG.name }],
-  creator: SITE_CONFIG.name,
-  publisher: SITE_CONFIG.name,
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
-  },
+  description:
+    'Autonomous UK Health & Safety news — prosecutions, enforcement, legislation, and analysis. Powered by NOVA-PRIME with Governance Swarm verification.',
+  keywords: [
+    'UK health and safety',
+    'HSE prosecutions',
+    'workplace safety',
+    'HSWA 1974',
+    'RIDDOR',
+    'CDM 2015',
+    'COSHH',
+    'enforcement notice',
+    'health and safety law',
+    'HSE news',
+    'NEBOSH',
+    'IOSH',
+  ],
+  authors: [{ name: 'NOVA-PRIME Editorial Desk' }],
+  creator: 'SafetyNews Pro',
+  publisher: 'SafetyNews Pro',
+  formatDetection: { email: false, address: false, telephone: false },
   openGraph: {
     type: 'website',
     locale: 'en_GB',
-    url: SITE_CONFIG.url,
-    title: SEO.DEFAULT_TITLE,
-    description: SEO.DEFAULT_DESCRIPTION,
-    siteName: SITE_CONFIG.name,
+    url: 'https://safetynews.pro',
+    title: 'SafetyNews Pro — UK Health & Safety Intelligence',
+    description:
+      'Autonomous UK Health & Safety news — prosecutions, enforcement, legislation, and analysis.',
+    siteName: 'SafetyNews Pro',
     images: [
       {
-        url: SITE_CONFIG.ogImage,
+        url: '/og-image.jpg',
         width: 1200,
         height: 630,
-        alt: SITE_CONFIG.name,
+        alt: 'SafetyNews Pro',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: SEO.DEFAULT_TITLE,
-    description: SEO.DEFAULT_DESCRIPTION,
-    images: [SITE_CONFIG.ogImage],
-    creator: '@hsenewsuk',
+    title: 'SafetyNews Pro — UK Health & Safety Intelligence',
+    description: 'Autonomous UK Health & Safety news. Prosecutions, enforcement, legislation.',
+    images: ['/og-image.jpg'],
+    creator: '@safetynewspro',
   },
   robots: {
     index: true,
@@ -71,49 +97,38 @@ export const metadata: Metadata = {
   manifest: '/site.webmanifest',
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
-      <head>
-        {/* Preconnect to external domains for performance */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'NewsMediaOrganization',
+  name: 'SafetyNews Pro',
+  description:
+    'Autonomous UK Health & Safety newsroom operated by NOVA-PRIME with Governance Swarm verification.',
+  url: 'https://safetynews.pro',
+  logo: 'https://safetynews.pro/logo.png',
+  sameAs: ['https://twitter.com/safetynewspro', 'https://linkedin.com/company/safetynewspro'],
+  publishingPrinciples: 'https://safetynews.pro/editorial-standards',
+}
 
-        {/* JSON-LD structured data for better SEO */}
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html
+      lang="en-GB"
+      suppressHydrationWarning
+      className={`${inter.variable} ${newsreader.variable} ${ibmPlexMono.variable}`}
+    >
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'WebSite',
-              name: SITE_CONFIG.name,
-              description: SEO.DEFAULT_DESCRIPTION,
-              url: SITE_CONFIG.url,
-              potentialAction: {
-                '@type': 'SearchAction',
-                target: {
-                  '@type': 'EntryPoint',
-                  urlTemplate: `${SITE_CONFIG.url}/search?q={search_term_string}`,
-                },
-                'query-input': 'required name=search_term_string',
-              },
-            }),
-          }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className="min-h-screen bg-background font-sans antialiased">
+      <body className="min-h-screen bg-background text-foreground antialiased">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="dark"
+          enableSystem={false}
           disableTransitionOnChange={false}
         >
           <div className="relative flex min-h-screen flex-col">
