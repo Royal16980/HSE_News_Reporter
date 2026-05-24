@@ -17,13 +17,23 @@ import { ReadingProgress } from '@/components/article/reading-progress'
 import type { Article } from '@/types/database'
 
 export async function generateStaticParams() {
-  const { data } = await supabase
-    .from('articles')
-    .select('slug')
-    .eq('status', 'published')
-    .limit(100)
+  // Skip database calls at build time if Supabase env vars aren't configured.
+  // Pages will be generated on-demand (ISR) at first request instead.
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return []
+  }
 
-  return data?.map((article) => ({ slug: article.slug })) || []
+  try {
+    const { data } = await supabase
+      .from('articles')
+      .select('slug')
+      .eq('status', 'published')
+      .limit(100)
+
+    return data?.map((article) => ({ slug: article.slug })) || []
+  } catch {
+    return []
+  }
 }
 
 export async function generateMetadata({
@@ -31,42 +41,50 @@ export async function generateMetadata({
 }: {
   params: { slug: string }
 }): Promise<Metadata> {
-  const { data: article } = await supabase
-    .from('articles')
-    .select('*')
-    .eq('slug', params.slug)
-    .eq('status', 'published')
-    .single()
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return { title: 'Article' }
+  }
 
-  if (!article) return { title: 'Article Not Found' }
+  try {
+    const { data: article } = await supabase
+      .from('articles')
+      .select('*')
+      .eq('slug', params.slug)
+      .eq('status', 'published')
+      .single()
 
-  const articleUrl = `${SITE_CONFIG.url}/news/${article.slug}`
+    if (!article) return { title: 'Article Not Found' }
 
-  return {
-    title: article.title,
-    description: article.excerpt,
-    keywords: article.tags,
-    authors: [{ name: article.author }],
-    openGraph: {
+    const articleUrl = `${SITE_CONFIG.url}/news/${article.slug}`
+
+    return {
       title: article.title,
       description: article.excerpt,
-      url: articleUrl,
-      type: 'article',
-      publishedTime: article.published_at,
-      modifiedTime: article.updated_at,
-      authors: [article.author],
-      tags: article.tags,
-      images: article.featured_image_url
-        ? [{ url: article.featured_image_url, width: 1200, height: 630, alt: article.title }]
-        : [],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: article.title,
-      description: article.excerpt,
-      images: article.featured_image_url ? [article.featured_image_url] : [],
-    },
-    alternates: { canonical: articleUrl },
+      keywords: article.tags,
+      authors: [{ name: article.author }],
+      openGraph: {
+        title: article.title,
+        description: article.excerpt,
+        url: articleUrl,
+        type: 'article',
+        publishedTime: article.published_at,
+        modifiedTime: article.updated_at,
+        authors: [article.author],
+        tags: article.tags,
+        images: article.featured_image_url
+          ? [{ url: article.featured_image_url, width: 1200, height: 630, alt: article.title }]
+          : [],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: article.title,
+        description: article.excerpt,
+        images: article.featured_image_url ? [article.featured_image_url] : [],
+      },
+      alternates: { canonical: articleUrl },
+    }
+  } catch {
+    return { title: 'Article Not Found' }
   }
 }
 
