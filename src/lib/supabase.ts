@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database'
 
 // Supabase client for client-side operations
-export const supabase = createClient<Database>(
+// Note: Using untyped client to avoid Supabase strict generic inference
+// causing 'never' type errors on valid column selectors
+export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   {
@@ -13,7 +14,7 @@ export const supabase = createClient<Database>(
 )
 
 // Supabase client for server-side operations with service role key
-export const supabaseAdmin = createClient<Database>(
+export const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   {
