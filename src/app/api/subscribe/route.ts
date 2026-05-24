@@ -18,9 +18,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Insert into database
-    // Cast to any to bypass strict Supabase type inference on runtime-typed inputs
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // Insert into database — cast to bypass strict Supabase type inference
     const { data, error } = await (supabase.from('newsletter_subscribers') as any)
       .insert([{ email: String(email), verified: false }])
       .select()
@@ -36,9 +34,6 @@ export async function POST(request: NextRequest) {
       }
       throw error
     }
-
-    // TODO: Send verification email here
-    // For now, we'll just return success
 
     return NextResponse.json(
       {
@@ -57,7 +52,4 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * Configure runtime to use Edge for better performance
- */
 export const runtime = 'edge'
