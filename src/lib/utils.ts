@@ -170,7 +170,7 @@ export function getCategoryColor(category: string): {
  * @param url - Article URL
  */
 export async function shareArticle(title: string, url: string): Promise<void> {
-  if (navigator.share) {
+  if ('share' in navigator) {
     try {
       await navigator.share({ title, url })
     } catch (error) {
