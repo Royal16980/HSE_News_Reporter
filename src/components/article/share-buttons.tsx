@@ -31,7 +31,7 @@ export function ShareButtons({ title, url, excerpt }: ShareButtonsProps) {
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(url)
+      await (navigator as any).clipboard.writeText(url)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (error) {
