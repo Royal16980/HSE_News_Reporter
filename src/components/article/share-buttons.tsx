@@ -19,9 +19,10 @@ export function ShareButtons({ title, url, excerpt }: ShareButtonsProps) {
   const [copied, setCopied] = React.useState(false)
 
   const handleNativeShare = async () => {
-    if ('share' in navigator) {
+    const nav = navigator as any
+    if (nav.share) {
       try {
-        await navigator.share({ title, url, text: excerpt })
+        await nav.share({ title, url, text: excerpt })
       } catch (error) {
         console.error('Error sharing:', error)
       }
@@ -58,7 +59,7 @@ export function ShareButtons({ title, url, excerpt }: ShareButtonsProps) {
 
       <div className="flex flex-wrap gap-3">
         {/* Native Share (Mobile) */}
-        {'share' in navigator && (
+        {(navigator as any).share && (
           <Button variant="outline" onClick={handleNativeShare}>
             <Share2 className="mr-2 h-4 w-4" />
             Share

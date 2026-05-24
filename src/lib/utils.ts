@@ -170,9 +170,11 @@ export function getCategoryColor(category: string): {
  * @param url - Article URL
  */
 export async function shareArticle(title: string, url: string): Promise<void> {
-  if ('share' in navigator) {
+  // Cast to any to avoid TypeScript narrowing navigator to 'never' in else branch
+  const nav = navigator as any
+  if (nav.share) {
     try {
-      await navigator.share({ title, url })
+      await nav.share({ title, url })
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
         console.error('Error sharing:', error)
@@ -181,7 +183,7 @@ export async function shareArticle(title: string, url: string): Promise<void> {
   } else {
     // Fallback to clipboard
     try {
-      await navigator.clipboard.writeText(url)
+      await nav.clipboard.writeText(url)
       // You could show a toast notification here
     } catch (error) {
       console.error('Error copying to clipboard:', error)
