@@ -128,21 +128,18 @@ export interface Database {
           workflow_name: string | null
           error_message: string | null
           created_at: string
-          [key: string]: unknown
         }
         Insert: {
           id?: string
           workflow_name?: string | null
           error_message?: string | null
           created_at?: string
-          [key: string]: unknown
         }
         Update: {
           id?: string
           workflow_name?: string | null
           error_message?: string | null
           created_at?: string
-          [key: string]: unknown
         }
       }
     }

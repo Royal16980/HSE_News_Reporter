@@ -19,9 +19,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert into database
-    const { data, error } = await supabase
-      .from('newsletter_subscribers')
-      .insert([{ email, verified: false }] as any[])
+    // Cast to any to bypass strict Supabase type inference on runtime-typed inputs
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('newsletter_subscribers') as any)
+      .insert([{ email: String(email), verified: false }])
       .select()
       .single()
 
