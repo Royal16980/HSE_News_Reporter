@@ -9,22 +9,7 @@ import { SITE_CONFIG } from '@/lib/constants'
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = SITE_CONFIG.url
 
-  // Fetch all published articles
-  const { data: articles } = await supabase
-    .from('articles')
-    .select('slug, updated_at, published_at')
-    .eq('status', 'published')
-    .order('published_at', { ascending: false })
-
-  const articleUrls: MetadataRoute.Sitemap =
-    articles?.map((article) => ({
-      url: `${baseUrl}/articles/${article.slug}`,
-      lastModified: new Date(article.updated_at),
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    })) || []
-
-  // Static pages
+  // Static pages (always included)
   const staticUrls: MetadataRoute.Sitemap = [
     {
       url: baseUrl,
@@ -51,6 +36,31 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
     },
   ]
+
+  // Guard: skip DB query at build time when env vars are not set (e.g. Vercel CI)
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return staticUrls
+  }
+
+  // Fetch all published articles
+  let articleUrls: MetadataRoute.Sitemap = []
+  try {
+    const { data: articles } = await supabase
+      .from('articles')
+      .select('slug, updated_at, published_at')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+
+    articleUrls =
+      articles?.map((article) => ({
+        url: `${baseUrl}/articles/${article.slug}`,
+        lastModified: new Date(article.updated_at),
+        changeFrequency: 'weekly' as const,
+        priority: 0.8,
+      })) || []
+  } catch (error) {
+    console.error('Sitemap: failed to fetch articles from Supabase', error)
+  }
 
   return [...staticUrls, ...articleUrls]
 }
