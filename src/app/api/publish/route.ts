@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Use service role key to bypass RLS for publishing
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 /**
  * POST /api/publish
  * Inserts a new article into the articles table.
@@ -64,6 +58,13 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Initialise admin client at request time (not module level) to avoid
+    // "supabaseUrl is required" errors during Next.js build page-data collection.
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
     // Auto-calculate reading time if not provided (avg 200 wpm)
     const wordCount = content.split(/\s+/).length
