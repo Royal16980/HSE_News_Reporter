@@ -41,9 +41,10 @@ export async function GET(request: NextRequest) {
       .gte('created_at', oneDayAgo.toISOString())
 
     // Count by priority
-    const highPriority = pendingArticles?.filter((a) => a.priority === 'HIGH').length || 0
-    const mediumPriority = pendingArticles?.filter((a) => a.priority === 'MEDIUM').length || 0
-    const lowPriority = pendingArticles?.filter((a) => a.priority === 'LOW').length || 0
+    const articles = (pendingArticles ?? []) as Array<{ priority?: string; [key: string]: unknown }>
+    const highPriority = articles.filter((a) => a.priority === 'HIGH').length
+    const mediumPriority = articles.filter((a) => a.priority === 'MEDIUM').length
+    const lowPriority = articles.filter((a) => a.priority === 'LOW').length
 
     return NextResponse.json({
       status: 'operational',
