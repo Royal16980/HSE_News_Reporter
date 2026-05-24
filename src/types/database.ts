@@ -26,9 +26,10 @@ export interface Database {
           author: string
           published_at: string
           featured_image_url: string | null
-          status: 'draft' | 'published' | 'archived'
+          status: 'draft' | 'published' | 'archived' | 'pending_review'
           views_count: number
           reading_time: number
+          priority: string | null
           created_at: string
           updated_at: string
         }
@@ -43,9 +44,10 @@ export interface Database {
           author: string
           published_at?: string
           featured_image_url?: string | null
-          status?: 'draft' | 'published' | 'archived'
+          status?: 'draft' | 'published' | 'archived' | 'pending_review'
           views_count?: number
           reading_time: number
+          priority?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -60,9 +62,10 @@ export interface Database {
           author?: string
           published_at?: string
           featured_image_url?: string | null
-          status?: 'draft' | 'published' | 'archived'
+          status?: 'draft' | 'published' | 'archived' | 'pending_review'
           views_count?: number
           reading_time?: number
+          priority?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -117,6 +120,29 @@ export interface Database {
           subscribed_at?: string
           verified?: boolean
           verification_token?: string | null
+        }
+      }
+      error_logs: {
+        Row: {
+          id: string
+          workflow_name: string | null
+          error_message: string | null
+          created_at: string
+          [key: string]: unknown
+        }
+        Insert: {
+          id?: string
+          workflow_name?: string | null
+          error_message?: string | null
+          created_at?: string
+          [key: string]: unknown
+        }
+        Update: {
+          id?: string
+          workflow_name?: string | null
+          error_message?: string | null
+          created_at?: string
+          [key: string]: unknown
         }
       }
     }

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     // Insert into database
     const { data, error } = await supabase
       .from('newsletter_subscribers')
-      .insert([{ email, verified: false }])
+      .insert([{ email, verified: false }] as any[])
       .select()
       .single()
 
