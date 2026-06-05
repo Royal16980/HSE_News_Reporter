@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Public env vars embedded at build time (anon key is safe - protected by RLS)
+  env: {
+    NEXT_PUBLIC_SUPABASE_URL: 'https://hsownlzxiqhnstvaftqm.supabase.co',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'sb_publishable_oe3mKyjPKWvk1IaywLQtgQ_ZX6FOQZm',
+    NEXT_PUBLIC_SITE_URL: 'https://hse-news-reporter.vercel.app',
+    NEXT_PUBLIC_SITE_NAME: 'UK Health & Safety News',
+  },
   images: {
     remotePatterns: [
       {
